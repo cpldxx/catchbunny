@@ -182,7 +182,7 @@ export function LandingPage() {
               <div className="ways">
                 <article>
                   <h3 className="display">Alone</h3>
-                  <Command text="catchbunny serve" />
+                  <Command text="catchbunny start" />
                   <ul>
                     <li><b>0</b><span>accounts. It answers only to localhost, so whoever reaches it is you</span></li>
                     <li><b>1</b><span>port for the console at /app and the MCP endpoint at /mcp</span></li>
@@ -190,7 +190,7 @@ export function LandingPage() {
                 </article>
                 <article>
                   <h3 className="display">With a team</h3>
-                  <Command text="catchbunny serve --team --public-url https://qa.yourcompany.com" />
+                  <Command text="catchbunny start --team --public-url https://qa.yourcompany.com" />
                   <ul>
                     <li><b>1</b><span>team code. A colleague creates their own account with it</span></li>
                     <li><b>1</b><span>key per person for a coding agent or CI, revoked on its own</span></li>
@@ -231,7 +231,7 @@ export function LandingPage() {
               </div>
               <div className="install-steps">
                 <Code label="Install" text="curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh" />
-                <Code label="Then, in a new terminal, see it work" text="catchbunny try" />
+                <Code label="Then, in a new terminal, open it" text="catchbunny start" />
               </div>
             </div>
           </section>

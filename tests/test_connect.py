@@ -169,6 +169,7 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "home").mkdir()
     (tmp_path / "project").mkdir()
     monkeypatch.setattr(installer, "_claude_is_open", lambda: False)
+    monkeypatch.setattr(installer.shutil, "which", lambda name: None)  # never the real `claude` or `codex` of whoever runs the tests
     return tmp_path
 
 
@@ -183,15 +184,23 @@ def test_claude_code_gets_a_project_file_and_other_servers_are_left_alone(home: 
     file.write_text(json.dumps({"mcpServers": {"other": {"command": "other-server"}}, "unrelated": True}))
     code, said = run_connect(home, "claude-code")
     doc = json.loads(file.read_text())
-    assert code == 0 and "approve the server" in said
-    assert doc["mcpServers"]["catchbunny"] == {"command": installer.launch()[0], "args": ["mcp"]}
+    assert code == 0 and "approve the server" in said, "without its CLI to add it everywhere, the project gets it"
+    assert doc["mcpServers"]["catchbunny"] == {"type": "http", "url": "http://127.0.0.1:8700/mcp"}, "it points at the server `catchbunny start` runs"
     assert doc["mcpServers"]["other"] == {"command": "other-server"} and doc["unrelated"] is True
     assert json.loads((home / "project" / ".mcp.json.bak").read_text())["mcpServers"] == {"other": {"command": "other-server"}}
 
     before = file.read_text()
     assert run_connect(home, "claude-code")[0] == 0 and file.read_text() == before, "connecting twice changes nothing"
+    assert run_connect(home, "claude-code", url=None)[0] == 0
+    assert json.loads(file.read_text())["mcpServers"]["catchbunny"] == {"command": installer.launch()[0], "args": ["mcp"]}, "--stdio: the agent starts it"
     assert run_connect(home, "claude-code", remove=True)[0] == 0
     assert json.loads(file.read_text())["mcpServers"] == {"other": {"command": "other-server"}}
+
+
+def test_with_its_cli_there_claude_code_gets_it_for_every_project(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(installer.shutil, "which", lambda name: "/usr/local/bin/claude" if name == "claude" else None)
+    code, said = run_connect(home, "claude-code", dry=True)
+    assert code == 0 and "claude mcp add-json catchbunny" in said and '"url":"http://127.0.0.1:8700/mcp"' in said.replace(" ", "") and "--scope user" in said
 
 
 def test_user_scope_for_claude_code_goes_through_its_own_cli_or_says_how(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -230,12 +239,14 @@ def test_codex_gets_one_table_and_the_rest_of_its_file_is_untouched(home: Path) 
     doc = tomllib.loads(text)
     ours = doc["mcp_servers"]["catchbunny"]
     assert code == 0 and "Restart Codex" in said
-    assert ours == {"command": installer.launch()[0], "args": ["mcp"], "startup_timeout_sec": 30, "tool_timeout_sec": 120}, "the old table and its sub-table are replaced, not added to"
+    assert ours == {"url": "http://127.0.0.1:8700/mcp", "tool_timeout_sec": 120}, "the old table and its sub-table are replaced, not added to"
     assert doc["mcp_servers"]["other"] == {"command": "other", "env": {"KEY": "value"}} and doc["projects"]["/somewhere"]["trust_level"] == "trusted"
     assert "# my settings" in text and "# keep me" in text, "comments survive: the file is edited as text"
     assert (file.parent / "config.toml.bak").read_text() == CODEX
 
     assert run_connect(home, "codex")[0] == 0 and file.read_text() == text
+    assert run_connect(home, "codex", url=None)[0] == 0
+    assert tomllib.loads(file.read_text())["mcp_servers"]["catchbunny"] == {"command": installer.launch()[0], "args": ["mcp"], "startup_timeout_sec": 30, "tool_timeout_sec": 120}
     assert run_connect(home, "codex", remove=True)[0] == 0
     assert "catchbunny" not in tomllib.loads(file.read_text())["mcp_servers"] and "other" in file.read_text()
 
@@ -266,10 +277,18 @@ def test_claude_desktop_is_left_alone_while_it_is_open(home: Path, monkeypatch: 
     assert json.loads(installer.claude_desktop_config().read_text())["mcpServers"]["catchbunny"]["args"] == ["mcp"]
 
 
-def test_with_no_agent_named_it_says_what_it_found(home: Path) -> None:
-    (home / "home" / ".codex").mkdir()
+def test_with_no_agent_named_it_connects_the_ones_it_finds(home: Path) -> None:
     code, said = run_connect(home)
-    assert code == 2 and "codex           found" in said and "catchbunny mcp --http" in said
+    assert code == 2 and "No Claude Code or Codex was found" in said and "codex           not found" in said
+
+    (home / "home" / ".codex").mkdir()
+    installer.claude_desktop_config().parent.mkdir(parents=True)
+    installer.claude_desktop_config().write_text("{}")
+    code, said = run_connect(home)
+    assert code == 0 and "Restart Codex" in said
+    assert tomllib.loads((home / "home" / ".codex" / "config.toml").read_text())["mcp_servers"]["catchbunny"]["url"] == "http://127.0.0.1:8700/mcp"
+    assert installer.claude_desktop_config().read_text() == "{}", "Claude Desktop is connected only when it is named"
+    assert not (home / "project" / ".mcp.json").exists(), "Claude Code was not found, so nothing was written for it"
 
 
 # ---------------------------------------------------------------- several servers, one data directory

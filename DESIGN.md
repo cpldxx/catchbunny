@@ -69,7 +69,7 @@ The character is **playful name, exact tool**: friendly in what it says, strict 
 The page never shows a number the product did not write to a file.
 
 The site offers a console only where there is one. It asks the server what it is (`install.ts`,
-`/v1/meta`): served by `catchbunny serve` it says "Open the console", on a team server "Sign in",
+`/v1/meta`): served by `catchbunny start` it says "Open the console", on a team server "Sign in",
 and on a static copy of the site, which has no server behind it, it offers the quick start instead.
 
 ## Colors

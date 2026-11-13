@@ -1,6 +1,6 @@
 // Is there a Catchbunny server behind this page?
 //
-// The same site is served two ways. `catchbunny serve` serves it together with the
+// The same site is served two ways. `catchbunny start` serves it together with the
 // API, the console and the MCP endpoint: an install. A copy on a static host is
 // only the site: there is no console to open, and saying "Open the console" there
 // would lead nowhere. So the pages ask, once, and offer the console only where

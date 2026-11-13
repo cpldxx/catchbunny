@@ -54,20 +54,15 @@ catchbunny doctor --install-browser > /dev/null 2>&1 || catchbunny doctor || tru
 uv tool update-shell > /dev/null 2>&1 || true
 
 say ""
-say "Catchbunny is installed."
+say "Catchbunny is installed. Open the console:"
+say ""
 case ":$START_PATH:" in
   *":$BIN:"*)
-    say "See it work on a shop with bugs planted in it:"
-    say ""
-    say "  catchbunny try"
+    say "  catchbunny start"
     ;;
   *)
-    say "Open a new terminal, then see it work on a shop with bugs planted in it:"
+    say "  catchbunny start        (in a new terminal)"
     say ""
-    say "  catchbunny try"
-    say ""
-    say "(Or right away, in this terminal: $BIN/catchbunny try)"
+    say "Or right away, in this terminal: $BIN/catchbunny start"
     ;;
 esac
-say ""
-say "Then point it at your own app:  catchbunny scan http://localhost:3000"

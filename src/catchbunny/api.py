@@ -10,7 +10,7 @@ Two ways to be served (`Serving`):
 * **On your own machine** (the default). No accounts: the server listens on
   localhost and answers only requests addressed to localhost, which is what
   keeps a web page you happen to have open from driving it.
-* **For a team** (`serve --team`). Every `/v1` request needs a signed-in
+* **For a team** (`start --team`). Every `/v1` request needs a signed-in
   browser or a key; people join with the team's code; and the MCP endpoint at
   `/mcp` takes the same keys, or signs a connector in with OAuth.
 
@@ -38,19 +38,22 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import Headers
 
 from .accounts import SESSION_DAYS, AccountError, Accounts, User
-from .domain import BROWSERS, Environment, Finding, LoginRecipe, Persona, Policy, Project, Run, RunSpec, RunStatus, Scenario
+from .demo_shop import BUGS, PASSWORD, USER, Running
+from .domain import BROWSERS, Environment, Finding, LoginRecipe, Persona, Policy, Project, Run, RunKind, RunSpec, RunStatus, Scenario
 from .engine import relevance
 from .engine.orchestrator import App
 from .engine.scenarios import finding_to_scenario, fix_prompt, playwright_test, scenario_from_yaml, scenario_to_yaml
 from .engine.triage import rank
+from .projects import ensure_project
 
 # The built site: in a checkout it is web/dist, rebuilt by `npm run build`; in an installed copy it was
-# packed into the package as catchbunny/web (see pyproject.toml), so `catchbunny serve` has its console.
+# packed into the package as catchbunny/web (see pyproject.toml), so `catchbunny start` has its console.
 _CHECKOUT_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 WEB_DIST = _CHECKOUT_DIST if (_CHECKOUT_DIST / "index.html").is_file() else Path(__file__).resolve().parent / "web"
 TERMINAL = {RunStatus.PASSED, RunStatus.FAILED, RunStatus.BLOCKED, RunStatus.CANCELED, RunStatus.ERROR}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 COOKIE = "catchbunny_session"
+DEMO_NAME = "Mug & Co, the demo shop"
 SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
 # What anyone may ask a team server without signing in: whether it is up, what it is, and the way in.
 OPEN_PATHS = ("/healthz", "/v1/meta", "/v1/docs", "/v1/openapi.json")
@@ -68,7 +71,7 @@ class Serving:
 
     team: bool = False  # accounts on: every /v1 request needs a signed-in browser or a key
     public_url: str = ""  # where people and agents reach it, e.g. https://qa.example.com (a team server's own domain)
-    local_only: bool = False  # answer only requests addressed to localhost (the default for `catchbunny serve`)
+    local_only: bool = False  # answer only requests addressed to localhost (the default for `catchbunny start`)
 
     @property
     def secure(self) -> bool:
@@ -171,7 +174,7 @@ class Guard:
         if self.serving.local_only and _hostname(host) not in LOOPBACK:
             # A page on another site can point a name of its own at 127.0.0.1 and talk to a local server
             # through the browser. Such a request names that site, never localhost.
-            await _refuse(scope, receive, send, 403, "FORBIDDEN", "This server answers only requests addressed to localhost. To use it from elsewhere, serve it for a team: catchbunny serve --team")
+            await _refuse(scope, receive, send, 403, "FORBIDDEN", "This server answers only requests addressed to localhost. To use it from elsewhere, serve it for a team: catchbunny start --team")
             return
         state = scope.setdefault("state", {})
         state["user"] = None
@@ -195,12 +198,14 @@ def create_app(core: App | None = None, *, manage: bool = False, serving: Servin
     serving = serving or Serving()
     accounts = Accounts(app_core.store, app_core.settings.data_dir)
     grants: Any = None  # the OAuth side of a team server; set below when it has one
+    shop = Running()  # the demo shop, started only if someone asks to scan it
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if owned:
             await app_core.start()
         yield
+        await shop.stop()
         if owned:
             await app_core.stop()
 
@@ -391,6 +396,33 @@ def create_app(core: App | None = None, *, manage: bool = False, serving: Servin
         await app_core.save_project(project)
         return project.public()
 
+    async def demo_project() -> Project:
+        """The demo shop as an app under test, with the shop running. It runs only while this server
+        does, so it is started again whenever it is about to be scanned."""
+        try:
+            url = await shop.start()
+        except (OSError, RuntimeError) as exc:
+            raise HTTPException(503, str(exc)) from exc
+        existing = next((d for d in await store.list("project") if d["name"] == DEMO_NAME), None)
+        if existing:
+            project = app_core.load_project(existing)
+            project.environments[0].base_url = url
+            await app_core.save_project(project)
+            return project
+        project = await ensure_project(app_core, url, user=USER, password=PASSWORD)
+        project.name = DEMO_NAME
+        await app_core.save_project(project)
+        return project
+
+    @api.post("/v1/demo", status_code=202)
+    async def scan_the_demo_shop() -> dict[str, Any]:
+        """Start Mug & Co, a shop with bugs planted in it, beside this server, and scan it: something to
+        watch before there is an app of your own to point Catchbunny at. No model, so nothing is billed."""
+        project = await demo_project()
+        spec = RunSpec(kind=RunKind.DEEP_SCAN, brain="heuristic", testers=6, devices=["desktop", "iphone"], max_steps=500, max_minutes=5)
+        run = await app_core.runs.start(project, spec)
+        return {"project_id": project.id, "run_id": run.id, "url": project.environments[0].base_url, "planted": len(BUGS)}
+
     @api.get("/v1/projects")
     async def list_projects() -> list[dict[str, Any]]:
         return [app_core.load_project(d).public() for d in await store.list("project")]
@@ -459,7 +491,10 @@ def create_app(core: App | None = None, *, manage: bool = False, serving: Servin
 
     @api.post("/v1/projects/{project_id}/runs", status_code=202)
     async def start_run(project_id: str, spec: RunSpec, idempotency_key: str = Header(default="")) -> dict[str, Any]:
-        run = await app_core.runs.start(await project_of(project_id), spec, idempotency_key)
+        project = await project_of(project_id)
+        if project.name == DEMO_NAME:
+            project = await demo_project()
+        run = await app_core.runs.start(project, spec, idempotency_key)
         return run.model_dump(mode="json")
 
     @api.get("/v1/projects/{project_id}/runs")
@@ -560,7 +595,7 @@ def create_app(core: App | None = None, *, manage: bool = False, serving: Servin
 
     # ------------------------------------------------------------------ console
     # The built web console (web/dist), when present, is served by the same process:
-    # one port, no CORS, and `catchbunny serve` is the whole product.
+    # one port, no CORS, and `catchbunny start` is the whole product.
 
     if WEB_DIST.is_dir():
 
@@ -596,7 +631,7 @@ class Front:
 
 
 def serve_app(core: App, serving: Serving) -> Front:
-    """What `catchbunny serve` runs."""
+    """What `catchbunny start` runs."""
     from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
     from mcp.server.transport_security import TransportSecuritySettings
     from pydantic import AnyHttpUrl

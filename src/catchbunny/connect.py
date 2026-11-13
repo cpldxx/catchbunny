@@ -1,16 +1,20 @@
-"""`catchbunny connect`: register the MCP server with the coding agents on this machine.
+"""`catchbunny connect`: point the coding agents on this machine at Catchbunny.
+
+By default an agent is pointed at the MCP endpoint of the Catchbunny that
+`catchbunny start` is running, http://127.0.0.1:8700/mcp: one server, so a scan an
+agent starts shows in the console as it happens. With `--stdio` the agent starts a
+Catchbunny of its own instead, and no server needs to be running.
 
 Each agent keeps its servers in a file of its own, in a format of its own:
 
-    claude-code     ./.mcp.json (project scope), or `claude mcp add-json --scope user`
+    claude-code     `claude mcp add-json --scope user` (every project), or ./.mcp.json (--scope project)
     codex           ~/.codex/config.toml  [mcp_servers.catchbunny]   (the CLI, the IDE extension and the desktop app share it)
-    claude-desktop  claude_desktop_config.json  "mcpServers"
+    claude-desktop  claude_desktop_config.json  "mcpServers"  (commands only, so always --stdio)
 
-This writes one entry named `catchbunny` into the file, leaves everything else in it
-as it was, keeps a `.bak` of what was there, and can take the entry out again.
-Nothing here talks to a network: connectors that reach Catchbunny over HTTP (Claude
-and ChatGPT on the web) are set up in those products, from what `catchbunny mcp --http`
-prints when it starts.
+This writes one entry named `catchbunny`, leaves everything else in the file as it
+was, keeps a `.bak` of what was there, and can take the entry out again. Connectors
+that reach Catchbunny over the internet (Claude and ChatGPT on the web) are set up
+in those products: see the console's Connect page on a team server.
 """
 
 from __future__ import annotations
@@ -28,6 +32,8 @@ from pathlib import Path
 
 NAME = "catchbunny"
 CLIENTS = ("claude-code", "codex", "claude-desktop")
+AUTO = ("claude-code", "codex")  # what `catchbunny connect` with no names connects, when it finds them
+DEFAULT_URL = "http://127.0.0.1:8700/mcp"  # where `catchbunny start` serves MCP
 
 
 def launch() -> list[str]:
@@ -113,8 +119,8 @@ def _shown(key: str, entry: dict[str, object]) -> str:
 _TABLE = re.compile(r"^\s*\[\[?\s*([^\]]+?)\s*\]\]?\s*(#.*)?$")
 
 
-def _toml_entry(path: Path, command: list[str] | None) -> str | None:
-    """`path` with a [mcp_servers.catchbunny] table for `command` (or without one, when command is None).
+def _toml_entry(path: Path, block: str | None) -> str | None:
+    """`path` with our [mcp_servers.catchbunny] table set to `block` (or without one, when block is None).
 
     Edited as text: the file is the user's, with their comments and ordering, and a
     rewrite through a TOML library would lose both. Only our own table is touched.
@@ -130,45 +136,57 @@ def _toml_entry(path: Path, command: list[str] | None) -> str | None:
         if not ours:
             kept.append(line)
     text = "\n".join(kept).rstrip("\n")
-    if command is not None:
-        text = (text + "\n\n" if text else "") + _toml_block(command)
+    if block is not None:
+        text = (text + "\n\n" if text else "") + block
     text = text + "\n" if text else ""
     tomllib.loads(text)
     return None if text == before else text
 
 
-def _toml_block(command: list[str]) -> str:
-    return "\n".join([
-        f"[mcp_servers.{NAME}]",
-        f"command = {json.dumps(command[0])}",
-        f"args = {json.dumps(command[1:])}",
-        "startup_timeout_sec = 30",  # starting up takes longer than the 10 seconds allowed by default
-        "tool_timeout_sec = 120",  # scan answers within 45 seconds and is polled; this is headroom, not the mechanism
-    ])
+def _toml_block(url: str | None) -> str:
+    """Our table: the endpoint of a running Catchbunny, or (url None) the command that starts one."""
+    if url:
+        where = [f"url = {json.dumps(url)}"]
+    else:
+        command = launch()
+        where = [
+            f"command = {json.dumps(command[0])}",
+            f"args = {json.dumps(command[1:])}",
+            "startup_timeout_sec = 30",  # starting up takes longer than the 10 seconds allowed by default
+        ]
+    # scan answers within 45 seconds and is polled; this is headroom, not the mechanism
+    return "\n".join([f"[mcp_servers.{NAME}]", *where, "tool_timeout_sec = 120"])
 
 
-def claude_code(scope: str, remove: bool, cwd: Path) -> Change:
+def _stdio() -> dict[str, object]:
+    command = launch()
+    return {"command": command[0], "args": command[1:]}
+
+
+def claude_code(scope: str, remove: bool, cwd: Path, url: str | None) -> Change:
+    if not scope:
+        scope = "user" if shutil.which("claude") else "project"  # once for every project, when its own CLI can do that
     if scope == "project":
         path = cwd / ".mcp.json"
-        entry = {"command": command[0], "args": command[1:]} if (command := launch()) else {}
+        entry = {"type": "http", "url": url} if url else _stdio()
         text = _json_entry(path, "mcpServers", None if remove else entry)
         if remove:
             return Change(f"claude-code     removed from {path}" if text else f"claude-code     was not in {path}", path, text)
         return Change(f"claude-code     {path} (this project). Start a new session in this folder and approve the server when asked.", path, text, entry=_shown("mcpServers", entry))
-    command = launch()
-    entry = json.dumps({"type": "stdio", "command": command[0], "args": command[1:]})
+    entry = json.dumps({"type": "http", "url": url} if url else {"type": "stdio", **_stdio()})
     argv = ["claude", "mcp", "remove", NAME, "--scope", "user"] if remove else ["claude", "mcp", "add-json", NAME, entry, "--scope", "user"]
     if shutil.which("claude") is None:
         raise RuntimeError("the `claude` command is not on PATH, and user scope is set through it. Use --scope project, or run:\n  " + " ".join(_quote(a) for a in argv))
-    return Change(f"claude-code     {'removed' if remove else 'added'} for every project (user scope)", argv=argv)
+    return Change(f"claude-code     {'removed' if remove else 'added'} for every project. Start a new Claude Code session to use it.", argv=argv)
 
 
-def codex(scope: str, remove: bool, cwd: Path) -> Change:
+def codex(scope: str, remove: bool, cwd: Path, url: str | None) -> Change:
     path = (cwd / ".codex" if scope == "project" else Path.home() / ".codex") / "config.toml"
-    text = _toml_entry(path, None if remove else launch())
+    block = _toml_block(url)
+    text = _toml_entry(path, None if remove else block)
     if remove:
         return Change(f"codex           removed from {path}" if text is not None else f"codex           was not in {path}", path, text)
-    return Change(f"codex           {path}. Restart Codex: its CLI, IDE extension and desktop app read the same file.", path, text, entry=_toml_block(launch()))
+    return Change(f"codex           {path}. Restart Codex: its CLI, IDE extension and desktop app read the same file.", path, text, entry=block)
 
 
 def claude_desktop_config() -> Path:
@@ -187,10 +205,9 @@ def _claude_is_open() -> bool:
     return any(line.strip().endswith("/Claude.app/Contents/MacOS/Claude") for line in listing.splitlines())
 
 
-def claude_desktop(scope: str, remove: bool, cwd: Path) -> Change:
+def claude_desktop(scope: str, remove: bool, cwd: Path, url: str | None) -> Change:
     path = claude_desktop_config()
-    command = launch()
-    entry = {"command": command[0], "args": command[1:]}
+    entry = _stdio()  # its config file takes a command to start, never an address
     text = _json_entry(path, "mcpServers", None if remove else entry)
     if text is not None and _claude_is_open():
         # The app keeps its own settings in this file and writes it back as it runs: an edit made now would be lost, or lose one of its.
@@ -200,7 +217,7 @@ def claude_desktop(scope: str, remove: bool, cwd: Path) -> Change:
     return Change(f"claude-desktop  {path}. Open Claude again.", path, text, entry=_shown("mcpServers", entry))
 
 
-PLAN: dict[str, Callable[[str, bool, Path], Change]] = {"claude-code": claude_code, "codex": codex, "claude-desktop": claude_desktop}
+PLAN: dict[str, Callable[[str, bool, Path, str | None], Change]] = {"claude-code": claude_code, "codex": codex, "claude-desktop": claude_desktop}
 
 
 def detected() -> dict[str, str]:
@@ -219,19 +236,23 @@ def detected() -> dict[str, str]:
     return found
 
 
-def connect(clients: list[str], *, scope: str = "", remove: bool = False, dry: bool = False, cwd: Path | None = None, say: Callable[[str], None] = print) -> int:
-    """Register the server with each named agent, or take it out again. Returns a process exit code."""
+def connect(
+    clients: list[str], *, url: str | None = DEFAULT_URL, scope: str = "", remove: bool = False, dry: bool = False, cwd: Path | None = None, say: Callable[[str], None] = print,
+) -> int:
+    """Point each named agent at Catchbunny (at `url`, or with url None at a command that starts one), or take
+    it out again. With no names, every agent of AUTO found on this machine. Returns a process exit code."""
     if not clients:
         found = detected()
-        say("Name the agents to connect, for example: catchbunny connect " + " ".join(found or CLIENTS))
-        for name in CLIENTS:
-            say(f"  {name:<15} {'found (' + found[name] + ')' if name in found else 'not found on this machine'}")
-        say("Claude and ChatGPT on the web connect over HTTP instead: run `catchbunny mcp --http --token auto` and follow what it prints.")
-        return 2
+        clients = [name for name in AUTO if name in found]
+        if not clients:
+            say("No Claude Code or Codex was found on this machine. Name the agent to connect, for example: catchbunny connect claude-code")
+            for name in CLIENTS:
+                say(f"  {name:<15} {'found (' + found[name] + ')' if name in found else 'not found on this machine'}")
+            return 2
     code = 0
     for name in clients:
         try:
-            change = PLAN[name](scope or ("project" if name == "claude-code" else "user"), remove, cwd or Path.cwd())
+            change = PLAN[name](scope or ("" if name == "claude-code" else "user"), remove, cwd or Path.cwd(), url)
             say(f"{name}: {change.describe()}" if dry else change.apply())
         except (OSError, ValueError, RuntimeError, tomllib.TOMLDecodeError) as exc:
             say(f"{name}: {exc}")
