@@ -1,0 +1,20 @@
+{
+ "ollama": {
+  "model": "a 35B model",
+  "runs": 2,
+  "found": {
+   "stale_badge": 2,
+   "negative_qty": 0
+  }
+ },
+ "claude": {
+  "model": "claude-opus-5-5",
+  "found": 2,
+  "bugs": [
+   "negative_qty",
+   "stale_badge"
+  ],
+  "usd": 0.7538,
+  "requests": 96
+ }
+}

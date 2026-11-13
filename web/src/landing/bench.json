@@ -1,0 +1,136 @@
+{
+ "bugs": [
+  {
+   "id": "checkout_500",
+   "planted": "Placing an order with quantity >= 2 returns 500",
+   "semantic": false,
+   "caught": true,
+   "severity": "P1",
+   "reported": "POST /api/orders returns 500",
+   "recorded": 14,
+   "kept": 8
+  },
+  {
+   "id": "search_500",
+   "planted": "Searching for % or a quote returns 500",
+   "semantic": false,
+   "caught": true,
+   "severity": "P1",
+   "reported": "GET /search returns 500",
+   "recorded": 6,
+   "kept": 3
+  },
+  {
+   "id": "reviews_crash",
+   "planted": "Show reviews throws on the Desk Lamp page",
+   "semantic": false,
+   "caught": true,
+   "severity": "P2",
+   "reported": "Uncaught exception on /products/#: Cannot read properties of null (reading 'map')",
+   "recorded": 23,
+   "kept": 2
+  },
+  {
+   "id": "dead_coupon",
+   "planted": "Apply coupon button does nothing",
+   "semantic": false,
+   "caught": true,
+   "severity": "P2",
+   "reported": "button \"Apply coupon\" does nothing on /cart",
+   "recorded": 22,
+   "kept": 4
+  },
+  {
+   "id": "mobile_overflow",
+   "planted": "Products page overflows on phones",
+   "semantic": false,
+   "caught": true,
+   "severity": "P2",
+   "reported": "/products overflows horizontally on iphone",
+   "recorded": 2,
+   "kept": 2
+  },
+  {
+   "id": "dead_link",
+   "planted": "Shipping policy link is a 404",
+   "semantic": false,
+   "caught": true,
+   "severity": "P2",
+   "reported": "Dead link: /shipping returns 404",
+   "recorded": 4,
+   "kept": 2
+  },
+  {
+   "id": "broken_image",
+   "planted": "Steel Bottle image is missing",
+   "semantic": false,
+   "caught": true,
+   "severity": "P3",
+   "reported": "Broken image /static/img/bottle-v2.svg",
+   "recorded": 2,
+   "kept": 2
+  },
+  {
+   "id": "unlabeled_input",
+   "planted": "Newsletter email field has no accessible label",
+   "semantic": false,
+   "caught": true,
+   "severity": "P3",
+   "reported": "Form field has no accessible label (#newsletter > input)",
+   "recorded": 1,
+   "kept": 1
+  },
+  {
+   "id": "prefs_error",
+   "planted": "Account page fails to load preferences",
+   "semantic": false,
+   "caught": true,
+   "severity": "P3",
+   "reported": "GET /api/prefs returns 404",
+   "recorded": 2,
+   "kept": 2
+  },
+  {
+   "id": "negative_qty",
+   "planted": "A negative quantity is accepted and makes the total negative",
+   "semantic": true,
+   "caught": false
+  },
+  {
+   "id": "stale_badge",
+   "planted": "Cart count in the nav does not drop after removing an item",
+   "semantic": true,
+   "caught": false
+  }
+ ],
+ "false_alarms": 0,
+ "on_fixed_build": 0,
+ "scenarios": {
+  "count": 10,
+  "fail_on_buggy": 10,
+  "pass_on_fixed": 10,
+  "model_requests": 0
+ },
+ "scaling": [
+  {
+   "testers": 1,
+   "steps_per_second": 8.73,
+   "speedup": 1.0
+  },
+  {
+   "testers": 2,
+   "steps_per_second": 17.18,
+   "speedup": 1.95
+  },
+  {
+   "testers": 4,
+   "steps_per_second": 29.4,
+   "speedup": 3.28
+  },
+  {
+   "testers": 8,
+   "steps_per_second": 49.71,
+   "speedup": 4.63
+  }
+ ]
+}

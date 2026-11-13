@@ -1,0 +1,72 @@
+/* The site outside the console: masthead, footer, and the few controls its pages share.
+   Same tokens and 4px grid as the console (styles.css). Display type is the Casual voice,
+   weight 800: 60 hero, 40 section titles, 32 bands. */
+
+html { scroll-behavior: smooth; }
+.site { min-height: 100%; display: flex; flex-direction: column; background: var(--page); }
+.site > main { flex: 1; }
+.frame { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+/* ---------------------------------------------------------------- masthead */
+
+.site-nav {
+  position: sticky; top: 0; z-index: 30;
+  height: 64px; padding: 0 32px; padding-left: max(32px, env(safe-area-inset-left)); padding-right: max(32px, env(safe-area-inset-right));
+  display: flex; align-items: center; gap: 32px;
+  background: var(--deep); border-bottom: 1px solid var(--hairline);
+}
+.site-nav nav { display: flex; gap: 24px; }
+.site-nav nav a, .site-foot nav a { color: var(--secondary); text-decoration: none; transition: color 0.16s var(--ease); }
+.site-nav nav a:hover, .site-foot nav a:hover, .site-nav nav a.active { color: var(--text); }
+.only-small { display: none; }
+.site-menu { display: none; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--raised); color: var(--text); cursor: pointer; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- shared panels and controls */
+
+/* A window is a piece of the product shown on a page: a panel with its own title bar. */
+.window { background: var(--card); border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden; }
+.window-bar { display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--hairline); }
+.window-bar strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.window-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; min-height: 48px; padding: 8px 16px; border-top: 1px solid var(--hairline); color: var(--secondary); font-size: 13px; }
+.window-foot strong { color: var(--text); }
+.again { display: inline-flex; align-items: center; gap: 8px; flex: none; height: 28px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--raised); color: var(--text); font-size: 13px; white-space: nowrap; cursor: pointer; transition: border-color 0.16s var(--ease), transform 0.12s var(--ease); }
+.again:hover, .play:hover { border-color: var(--hairline-strong); }
+.again:active, .play:active { transform: scale(0.98); }
+.play { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--raised); color: var(--text); cursor: pointer; transition: border-color 0.16s var(--ease), transform 0.12s var(--ease); }
+pre.code.flat { height: auto; max-height: none; margin: 0; padding: 16px; border: 0; border-radius: 0; background: var(--deep); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; }
+
+.cmd { display: flex; align-items: center; gap: 12px; min-width: 0; height: 44px; padding: 0 8px 0 16px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--deep); }
+.cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; color: var(--text); scrollbar-width: none; }
+
+/* ---------------------------------------------------------------- footer */
+
+.site-foot { padding: 56px 0 32px; border-top: 1px solid var(--hairline); background: var(--deep); }
+.site-foot > .frame:first-child { display: grid; grid-template-columns: minmax(0, 5fr) repeat(3, minmax(0, 2fr)); gap: 48px; }
+.foot-brand .brand { height: auto; padding: 0; }
+.foot-brand p { margin-top: 12px; max-width: 40ch; color: var(--secondary); }
+.site-foot nav { display: grid; gap: 8px; align-content: start; }
+.site-foot nav h2 { margin-bottom: 4px; font: 600 14px/20px var(--font-ui); color: var(--text); }
+.foot-base { display: flex; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--hairline); color: var(--muted); font-size: 13px; }
+
+/* ---------------------------------------------------------------- not found */
+
+.lost { display: grid; align-items: center; padding: 96px 0; }
+.lost h1 { margin-top: 24px; font-size: 40px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; }
+.lost p { margin: 12px 0 24px; max-width: 48ch; font-size: 16px; line-height: 24px; color: var(--secondary); }
+
+@media (max-width: 860px) {
+  .frame { padding: 0 16px; }
+  .site-nav { padding: 0 16px; gap: 12px; flex-wrap: wrap; height: auto; min-height: 64px; }
+  .site-nav nav { display: none; order: 5; flex-direction: column; gap: 0; width: 100%; padding-bottom: 12px; }
+  .site-nav.open nav { display: flex; }
+  .site-nav nav a { padding: 12px 0; }
+  .site-menu { display: inline-flex; }
+  .nav-cta, .opt { display: none; }
+  .only-small { display: block; }
+  .site-foot > .frame:first-child { grid-template-columns: 1fr 1fr; gap: 32px; }
+  .foot-brand { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}

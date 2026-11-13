@@ -1,0 +1,183 @@
+{
+  "latency_ms": 25,
+  "seeded": 11,
+  "detectable": 9,
+  "buggy": {
+    "confirmed": 10,
+    "true_positive_findings": 10,
+    "false_positive_findings": [],
+    "bugs_found": [
+      "broken_image",
+      "checkout_500",
+      "dead_coupon",
+      "dead_link",
+      "mobile_overflow",
+      "prefs_error",
+      "reviews_crash",
+      "search_500",
+      "unlabeled_input"
+    ],
+    "bugs_missed": [
+      "negative_qty",
+      "stale_badge"
+    ],
+    "recall_detectable": 1.0,
+    "recall_all": 0.818,
+    "precision": 1.0,
+    "not_reproduced": 1,
+    "flaky": 0,
+    "repro_steps_before": 78,
+    "repro_steps_after": 28,
+    "steps": 504,
+    "hunt_seconds": 11.59,
+    "triage_seconds": 17.16,
+    "steps_per_second": 43.5,
+    "verification_replays": 87,
+    "coverage": {
+      "screens": 25,
+      "templates": 20,
+      "transitions": 139,
+      "controls_found": 85,
+      "controls_exercised": 82,
+      "control_coverage": 0.965,
+      "scopes": [
+        "member@desktop",
+        "member@iphone",
+        "visitor@desktop",
+        "visitor@iphone"
+      ]
+    },
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "GET /search returns 500",
+        "bug": "search_500",
+        "repro_steps": 3,
+        "from_steps": 6
+      },
+      {
+        "severity": "P1",
+        "title": "POST /api/orders returns 500",
+        "bug": "checkout_500",
+        "repro_steps": 8,
+        "from_steps": 14
+      },
+      {
+        "severity": "P2",
+        "title": "/products overflows horizontally on iphone",
+        "bug": "mobile_overflow",
+        "repro_steps": 2,
+        "from_steps": 2
+      },
+      {
+        "severity": "P2",
+        "title": "Dead link: /shipping returns 404",
+        "bug": "dead_link",
+        "repro_steps": 2,
+        "from_steps": 4
+      },
+      {
+        "severity": "P2",
+        "title": "button \"Apply coupon\" does nothing on /cart",
+        "bug": "dead_coupon",
+        "repro_steps": 4,
+        "from_steps": 22
+      },
+      {
+        "severity": "P2",
+        "title": "Uncaught exception on /products/#: Cannot read properties of null (reading 'map')",
+        "bug": "reviews_crash",
+        "repro_steps": 2,
+        "from_steps": 23
+      },
+      {
+        "severity": "P3",
+        "title": "Form field has no accessible label (#newsletter > input)",
+        "bug": "unlabeled_input",
+        "repro_steps": 1,
+        "from_steps": 1
+      },
+      {
+        "severity": "P3",
+        "title": "Broken image /static/img/bottle-v2.svg",
+        "bug": "broken_image",
+        "repro_steps": 2,
+        "from_steps": 2
+      },
+      {
+        "severity": "P3",
+        "title": "GET /api/prefs returns 404",
+        "bug": "prefs_error",
+        "repro_steps": 2,
+        "from_steps": 2
+      },
+      {
+        "severity": "P3",
+        "title": "Console error on /account: Failed to load preferences: HTTP 404",
+        "bug": "prefs_error",
+        "repro_steps": 2,
+        "from_steps": 2
+      }
+    ]
+  },
+  "fixed": {
+    "confirmed": [],
+    "steps": 473,
+    "screens": 23
+  },
+  "regression": {
+    "scenarios": 10,
+    "fail_on_buggy": 10,
+    "pass_on_fixed": 10,
+    "other_on_buggy": 0,
+    "other_on_fixed": 0,
+    "not_passing_on_fixed": [],
+    "steps_replayed_without_model": 18,
+    "model_requests": 0
+  },
+  "scaling": [
+    {
+      "testers": 1,
+      "steps": 307,
+      "hunt_seconds": 35.17,
+      "steps_per_second": 8.73,
+      "wall_seconds": 46.46,
+      "speedup": 1.0
+    },
+    {
+      "testers": 2,
+      "steps": 310,
+      "hunt_seconds": 18.05,
+      "steps_per_second": 17.18,
+      "wall_seconds": 24.41,
+      "speedup": 1.95
+    },
+    {
+      "testers": 4,
+      "steps": 315,
+      "hunt_seconds": 10.72,
+      "steps_per_second": 29.4,
+      "wall_seconds": 14.59,
+      "speedup": 3.28
+    },
+    {
+      "testers": 8,
+      "steps": 378,
+      "hunt_seconds": 7.6,
+      "steps_per_second": 49.71,
+      "wall_seconds": 9.95,
+      "speedup": 4.63
+    }
+  ],
+  "pool": {
+    "browsers": 2,
+    "launched": 2,
+    "contexts_opened": 211,
+    "peak_contexts": 12
+  },
+  "store": {
+    "writes": 2750,
+    "batches": 1913,
+    "writes_per_batch": 1.4
+  }
+}
