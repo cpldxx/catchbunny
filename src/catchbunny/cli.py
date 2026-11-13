@@ -1,6 +1,7 @@
 """`catchbunny` command line: the same engine as the API, in-process.
 
-    catchbunny demo                                      # a small shop with bugs planted in it, to try this on
+    catchbunny try                                       # the whole thing at once, on a shop with bugs planted in it
+    catchbunny demo                                      # just that shop, to point other commands at
     catchbunny scan     http://localhost:3000            # swarm bug hunt
     catchbunny discover http://localhost:3000            # map the app, draft scenarios
     catchbunny run      --url http://localhost:3000 scenarios/*.yaml
@@ -74,9 +75,13 @@ async def _follow(app: App, run: Run, quiet: bool) -> None:
 async def _run(app: App, project: Project, spec: RunSpec, args: argparse.Namespace) -> int:
     run = await app.runs.start(project, spec)
     await _follow(app, run, args.json)
-    run = await app.runs.wait(run.id)
+    return await _report(app, await app.runs.wait(run.id), args.json)
+
+
+async def _report(app: App, run: Run, as_json: bool) -> int:
+    """A finished run, said once: one JSON object for an agent, or a summary for a person. Returns the exit code."""
     findings = rank([Finding(**d) for d in await app.store.list("finding", parent=run.id)])
-    if args.json:
+    if as_json:
         nxt = [{"argv": ["catchbunny", "export", f.id, "--format", "prompt"]} for f in findings if f.status.value == "confirmed"][:5]
         print(json.dumps({"status": run.status.value, "run_id": run.id, "error": run.error, "summary": run.summary, "findings": [{**f.model_dump(mode="json", include={"id", "severity", "status", "title", "url"}), "steps": f.repro_text()} for f in findings], "next": nxt}))
     else:
@@ -135,6 +140,73 @@ async def _ensure_browser(settings: Settings, engine: str) -> str:
         _install_browser(settings, engine)
         problem = await _browser_starts(settings, engine)
     return problem
+
+
+def _free_port(preferred: int) -> int:
+    """`preferred` if nothing is listening there, else any free port."""
+    for port in (preferred, 0):
+        with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # as the server will: a port just let go of is free
+            try:
+                probe.bind(("127.0.0.1", port))
+                return int(probe.getsockname()[1])
+            except OSError:
+                continue
+    raise OSError("no free port on 127.0.0.1")
+
+
+async def _try(settings: Settings, args: argparse.Namespace) -> int:
+    """Everything at once, for someone who has just installed it: the demo shop, a scan of it, and the
+    console showing that scan as it happens. One terminal, one command."""
+    import webbrowser
+
+    import uvicorn
+
+    from .api import Serving, serve_app
+    from .demo_shop import BUGS, PASSWORD, USER, create_shop, parse_bugs
+
+    if problem := await _ensure_browser(settings, "chromium"):
+        _say(f"The browser cannot start: {problem}\nCheck with: catchbunny doctor")
+        return 2
+    import logging
+
+    logging.getLogger("mcp").setLevel(logging.WARNING)  # the MCP transport's start-up chatter is not for this terminal
+    shop_url, console_url = (f"http://127.0.0.1:{_free_port(p)}" for p in (8811, 8700))
+    core = App(settings)
+    shop = uvicorn.Server(uvicorn.Config(create_shop(parse_bugs("all")), host="127.0.0.1", port=int(shop_url.rsplit(":", 1)[1]), log_level="warning"))
+    console = uvicorn.Server(uvicorn.Config(serve_app(core, Serving(local_only=True, public_url=console_url)), host="127.0.0.1", port=int(console_url.rsplit(":", 1)[1]), log_level="warning"))
+    servers = [asyncio.create_task(shop.serve()), asyncio.create_task(console.serve())]
+
+    async def stop() -> None:
+        shop.should_exit = console.should_exit = True
+        await asyncio.gather(*servers, return_exceptions=True)
+
+    while not (shop.started and console.started):
+        if any(task.done() for task in servers):
+            await stop()
+            _say("Could not start the demo shop or the console. Check that ports are free, then try again.")
+            return 2
+        await asyncio.sleep(0.05)
+
+    _say(f"{f'Mug & Co, a shop with {len(BUGS)} bugs planted in it':<44}{shop_url}")
+    _say(f"{'The console, where you can watch the testers':<44}{console_url}/app")
+    project = await ensure_project(core, shop_url, user=USER, password=PASSWORD)
+    spec = RunSpec(kind=RunKind.DEEP_SCAN, brain=args.brain, testers=6, devices=["desktop", "iphone"], max_steps=500, max_minutes=5)
+    run = await core.runs.start(project, spec)
+    watch = f"{console_url}/app/runs/{run.id}"
+    _say(f"\nScanning it now: six testers, signed out and signed in, on a desktop and a phone. Watch it live at\n  {watch}\n")
+    if not args.no_open:
+        webbrowser.open(watch)
+    await _follow(core, run, quiet=False)
+    code = await _report(core, await core.runs.wait(run.id), as_json=False)
+    _say(f"\nEvery finding above was replayed in a fresh browser before it was reported. Open one to see the recording:\n  {watch}")
+    _say("\nYour own app is next, while it is running:\n  catchbunny scan http://localhost:3000")
+    if args.exit:
+        await stop()
+        return code
+    _say("\nThe console stays open until you press Ctrl+C.")
+    await asyncio.gather(*servers, return_exceptions=True)
+    return code
 
 
 async def _demo(args: argparse.Namespace) -> int:
@@ -282,6 +354,8 @@ async def _main(args: argparse.Namespace) -> int:
         return await _serve(settings, args)
     if args.command == "demo":
         return await _demo(args)
+    if args.command == "try":
+        return await _try(settings, args)
     if args.command in ("scan", "discover", "run") and (problem := await _ensure_browser(settings, args.browser)):
         _say(f"The {args.browser} browser cannot start: {problem}\nCheck with: catchbunny doctor --browser {args.browser}")
         return 2
@@ -380,6 +454,11 @@ def main(argv: list[str] | None = None) -> None:
         sp.add_argument("--screenshots", default="on_signal", choices=["on_signal", "every_step", "off"])
         sp.add_argument("--knowledge", default="", help="product notes for the testers")
         target(sp)
+
+    sp = sub.add_parser("try", help="see it work: start a shop with bugs planted in it, scan it, and open the console on that scan")
+    sp.add_argument("--brain", default="heuristic", choices=["heuristic", "claude", "ollama"], help="who drives the testers (default: no model, so nothing is billed)")
+    sp.add_argument("--no-open", action="store_true", help="do not open the browser")
+    sp.add_argument("--exit", action="store_true", help="stop when the scan is done, instead of keeping the console open")
 
     sp = sub.add_parser("demo", help="start the demo shop, a small store with bugs planted in it, to try Catchbunny on")
     sp.add_argument("--port", type=int, default=8811)

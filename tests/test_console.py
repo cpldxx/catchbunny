@@ -47,7 +47,8 @@ async def test_a_static_copy_of_the_site_does_not_offer_a_console_it_does_not_ha
         await expect(page.locator(".nav-cta")).to_have_text("Get started")
         await page.goto(f"{base}/app")
         await expect(page.get_by_role("heading", level=1)).to_have_text("The console runs where Catchbunny runs")
-        await expect(page.get_by_text("uv tool install git+https://github.com/cpldxx/catchbunny")).to_be_visible(), "what a stranger can paste: no checkout, no Node"
+        await expect(page.get_by_text("raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh")).to_be_visible(), "what a stranger can paste: no checkout, no Node"
+        await expect(page.get_by_text("catchbunny try")).to_be_visible()
 
 
 async def test_on_your_own_machine_the_console_opens_with_no_sign_in(app: App) -> None:

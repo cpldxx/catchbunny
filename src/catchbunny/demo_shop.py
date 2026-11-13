@@ -152,7 +152,12 @@ def create_shop(bugs: set[str], latency_ms: int = 0) -> FastAPI:
             await asyncio.sleep(latency_ms / 1000)  # stand-in for a real backend's latency
         sid = request.cookies.get("sid") or secrets.token_hex(8)
         request.state.s = sessions.setdefault(sid, {"cart": {}, "orders": [], "user": None, "badge": 0})
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # A planted server error. It is meant to be a plain 500, not a traceback in the terminal
+            # of whoever is trying Catchbunny (the shop may run in the same process as the scan).
+            response = Response("Internal Server Error", status_code=500, media_type="text/plain")
         response.set_cookie("sid", sid, httponly=True)
         return response
 
