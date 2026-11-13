@@ -21,31 +21,69 @@ It is an [MCP server](#use-it-from-a-coding-agent-mcp): Claude Code, Codex, Clau
 
 ## Quick start
 
+Every block below can be pasted as it is. Tested on macOS; Linux should work the same way, Windows has not been tried.
+
+If you do not have [uv](https://docs.astral.sh/uv/) yet, install it, then open a new terminal:
+
 ```bash
-uv sync && uv run playwright install chromium --only-shell
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Install Catchbunny. uv fetches the Python it needs; the browser it tests with is downloaded on first use, once.
+
+```bash
+uv tool install git+https://github.com/cpldxx/catchbunny
+```
+
+If the next command says `catchbunny: command not found`, run `uv tool update-shell` and open a new terminal.
+
+Start the demo shop, a small store with bugs planted in it. It runs until you stop it with Ctrl+C:
+
+```bash
+catchbunny demo
+```
+
+In a second terminal, scan it:
+
+```bash
+catchbunny scan http://127.0.0.1:8811 --user demo --password demo-pass
+```
+
+Open the console, which shows that scan and every run after it:
+
+```bash
+catchbunny serve
+```
+
+Then open http://127.0.0.1:8700/app. Your own app is the same with its own address: `catchbunny scan http://localhost:3000`.
+
+| More | |
+|---|---|
+| `catchbunny scan <url> --browser webkit` | Test in the engine Safari is built on (downloaded the first time) |
+| `catchbunny scan <url> --devices desktop,iphone` | A phone as well as a desktop |
+| `catchbunny scan <url> --brain claude` | Claude-driven testers on top of the detectors (needs `ANTHROPIC_API_KEY`) |
+| `catchbunny scan <url> --brain ollama --model <tag>` | The same on a model on your own machine |
+| `catchbunny export <finding-id> --format scenario -o checkout.yaml` | Keep a finding as a regression test (or `playwright`, `prompt`) |
+| `catchbunny run --url <url> checkout.yaml` | Run it: exit code 1 while the bug exists |
+| `catchbunny connect claude-code codex` | Let those agents start Catchbunny themselves ([below](#use-it-from-a-coding-agent-mcp)) |
+| `catchbunny serve --team --public-url https://qa.example.com` | The same server for a team ([below](#serve-it-for-a-team)) |
+| `uv tool install --reinstall git+https://github.com/cpldxx/catchbunny` | Update to the latest version |
+
+Runs, findings and recordings are kept in `~/.catchbunny`, whoever starts them.
+
+### From a checkout
+
+To work on Catchbunny itself:
+
+```bash
+git clone https://github.com/cpldxx/catchbunny && cd catchbunny && uv sync
 ```
 
 ```bash
-uv run python bench/buggy_shop.py --port 8811 --bugs all
+uv run pytest
 ```
 
-```bash
-uv run catchbunny scan http://127.0.0.1:8811 --testers 8 --devices desktop,iphone --user demo --password demo-pass
-```
-
-```bash
-uv run catchbunny export <finding-id> --format scenario -o checkout.yaml   # or: playwright | prompt
-uv run catchbunny run --url http://127.0.0.1:8811 checkout.yaml            # exit code 1 while the bug exists
-uv run catchbunny scan http://127.0.0.1:8811 --brain ollama --model qwen3.6:35b   # goal-directed testers on a local model
-(cd web && npm install && npm run build)                                   # build the console once
-uv run catchbunny serve                                                    # landing page at /, console at /app, API at /v1, MCP at /mcp, all on :8700
-uv run catchbunny serve --team --public-url https://qa.example.com         # the same for a team: sign-in, a team code, a key per person
-uv run catchbunny scan http://127.0.0.1:8811 --browser webkit              # in the engine Safari is built on (uv run playwright install webkit)
-uv run catchbunny connect claude-code codex                                # register the MCP server with those agents (see below)
-uv run pytest                                                              # 87 tests, ~3 min
-uv run python bench/run_model.py --brain claude                            # measure a Claude-driven run (needs ANTHROPIC_API_KEY; spends up to $2)
-uv run python bench/run_bench.py                                           # regenerates bench/RESULTS.md
-```
+`uv run catchbunny ...` runs the checkout. The site is committed built in `web/dist`, so a `git+https` install needs no Node; after changing anything under `web/src`, rebuild it with `(cd web && npm install && npm run build)` and commit `web/dist` with the change. `uv run python bench/run_bench.py` regenerates `bench/RESULTS.md` and the landing page's benchmark; `uv run python bench/run_model.py --brain claude` measures a Claude-driven run (spends up to $2).
 
 With `ANTHROPIC_API_KEY` set, `--brain auto` adds Claude-driven testers on top of the heuristic ones. `--brain ollama --model <tag>` does the same with a model on your own machine: no key, nothing billed, nothing leaves it. Without either, everything above still runs.
 
@@ -205,7 +243,7 @@ The console has a page for this, **Connect an agent**, which shows the command f
 With no server running, an agent can start Catchbunny itself over stdio. These three steps are written so that an agent asked to "install Catchbunny" can follow them as they are.
 
 ```bash
-uv tool install /path/to/this/folder
+uv tool install git+https://github.com/cpldxx/catchbunny
 ```
 
 ```bash
@@ -226,7 +264,7 @@ The first puts a `catchbunny` command on the machine, in an environment of its o
 
 `connect` touches one entry named `catchbunny` and nothing else in the file: other servers, comments and ordering stay as they were, the previous file is kept as `.bak`, a file that does not parse is left alone, `--print` shows the entry without writing, and `--remove` takes it out. The path it writes is absolute, because an app started from the dock does not have your shell's `PATH`.
 
-Started by an agent, the server keeps its records in `~/.catchbunny` (not in whichever folder the agent happens to be in), so a finding from yesterday's session can be re-checked today. Several sessions can share that directory: each run records the process that owns it, so a server starting up does not mistake another server's run for one that died.
+Started by an agent, the server keeps its records in `~/.catchbunny`, like everything else (not in whichever folder the agent happens to be in), so a finding from yesterday's session can be re-checked today, and the console shows the scans an agent ran. Several sessions can share that directory: each run records the process that owns it, so a server starting up does not mistake another server's run for one that died.
 
 ### Claude and ChatGPT
 
@@ -373,7 +411,7 @@ The page at `/` explains the product by showing it. It follows the skeleton the 
 
 Motion is there to explain: screens appear as they were discovered, pips fill as replays finish, steps are struck as they are removed. Each figure plays once when it is first seen, the run pauses when it is off screen, and everything stands still for a visitor who prefers reduced motion. The assets are in `web/public/demo/` (page screenshots and the replay video) and `web/src/landing/demo-run.json`; `web/scripts/export_demo.py --run <id>` regenerates all of them from any finished run of the demo shop.
 
-The demo shop itself (`bench/buggy_shop.py`) is dressed as a real small store - illustrated products, a proper cart and checkout - because it is what people see in the tiles and the recording. The dressing is presentation only: every control, label, id and handler is unchanged, nothing loads from another origin, and no decoration is interactive. One thing did leak while restyling it: a placeholder on the newsletter field gave the field an accessible name and silently repaired a seeded bug. The test suite caught it, and the placeholder is gone.
+The demo shop itself (`catchbunny demo`, in `src/catchbunny/demo_shop.py`) is dressed as a real small store - illustrated products, a proper cart and checkout - because it is what people see in the tiles and the recording. The dressing is presentation only: every control, label, id and handler is unchanged, nothing loads from another origin, and no decoration is interactive. One thing did leak while restyling it: a placeholder on the newsletter field gave the field an accessible name and silently repaired a seeded bug. The test suite caught it, and the placeholder is gone.
 
 ### Design
 
@@ -427,7 +465,7 @@ Where this goes further: verification is automatic rather than a button; reprodu
 
 ## HTTP API
 
-`uv run catchbunny serve` → `http://127.0.0.1:8700` (interactive API reference at `/v1/docs`; `/docs` is the product's own documentation).
+`catchbunny serve` → `http://127.0.0.1:8700` (interactive API reference at `/v1/docs`; `/docs` is the product's own documentation).
 
 | Method | Path | |
 |---|---|---|
@@ -465,18 +503,19 @@ Event types: `run.queued`, `run.phase`, `login`, `mission.started`, `step`, `mis
 - Screens that depend on session state another tester built cannot be reached by URL; the tester that built them explores them, others skip them.
 - "Does nothing" detection cannot see every effect (it does see DOM changes, requests, navigation, dialogs, clipboard, storage, history, print). It is P3, or P2 when the control's label says it is one a person came to use (pay, save, apply, sign in).
 - Scenario relevance is lexical. Multi-actor scenarios and scheduled monitors are not built.
-- The MCP endpoint has been driven by the MCP SDK's client (including its OAuth client), by Codex and by Claude Code, not yet by the connectors inside Claude and ChatGPT. An installed copy (`uv tool install`) has the engine, the CLI and the MCP server but not the built web console, which is served from a checkout.
+- The MCP endpoint has been driven by the MCP SDK's client (including its OAuth client), by Codex and by Claude Code, not yet by the connectors inside Claude and ChatGPT. An installed copy carries the built console with it.
 - A team server has one team and is one process. Sign-in is email and password: no single sign-on, no password reset by email.
 - The console's pages are checked in a real browser for loading and for the ways in (`tests/test_console.py`); their finer behaviour was checked by hand at desktop and phone widths.
 
 ## Layout
 
 ```
-src/catchbunny/        domain, store, events, budget, config, vault, projects, api (API, request guard, the combined server), accounts (team, users, sessions, keys), oauth (connector sign-in), cli, mcp_server (stdio + HTTP), connect (agent registration)
+src/catchbunny/        domain, store, events, budget, config, vault, projects, api (API, request guard, the combined server), accounts (team, users, sessions, keys), oauth (connector sign-in), cli, mcp_server (stdio + HTTP), connect (agent registration), demo_shop (the shop `catchbunny demo` starts; the benchmark's target)
   browser/           observe, locate, session, samples (files for upload controls)
   brain/             base, heuristic, llm (provider-neutral), claude, ollama
   engine/            productmap, tester, replay, triage, scenarios, relevance, orchestrator
-bench/               buggy_shop.py (target), run_bench.py, run_model.py (a model-driven run, measured), RESULTS.md
+bench/               buggy_shop.py (the demo shop under its old path), run_bench.py, run_model.py (a model-driven run, measured), RESULTS.md
+web/dist/            the built site, committed so an install needs no Node
 web/src/             api, install (is a server behind this page?), stream (SSE store), theme (tokens), antTheme, console (the /app chunk), pages/ (incl. Connect, Team and the ways in), components/ (Lanes, RouteTree, Evidence, marks, controls, ...), landing/ (page, recorded run, bench.json, models.json), docs/, site/ (masthead, footer)
 DESIGN.md PRODUCT.md  the design system, and what the product is
 tests/               core (no browser), browser, reach (engines, uploads, drags, frames, shadow roots, reset; lab_app.py is its target), claude (fake client), ollama (fake server), mcp (real client, in-memory), connect (HTTP, stdio subprocess, installer), team (accounts, keys, OAuth with the SDK's client), console (the pages in a real browser), e2e

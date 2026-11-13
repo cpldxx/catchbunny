@@ -23,7 +23,9 @@ def _ollama_host() -> str:
 
 @dataclass(slots=True)
 class Settings:
-    data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", ".catchbunny")))
+    # One place for every run, whoever starts it: the console, a terminal or a coding agent. A run an agent
+    # started is then in the console too. --data-dir or CATCHBUNNY_DATA_DIR puts it elsewhere.
+    data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", "") or Path.home() / ".catchbunny"))
 
     # ---- browser fleet
     browser: str = field(default_factory=lambda: _env("BROWSER", "chromium"))  # the engine a run uses unless it names one: chromium | firefox | webkit

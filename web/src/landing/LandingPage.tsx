@@ -67,7 +67,7 @@ export function LandingPage() {
                     <Link to="/docs/quick-start" className="btn primary large">Run your first scan</Link>
                     {door ? <Link to={door.to} className="btn large">{door.label}</Link> : <Link to={{ pathname: "/", hash: "#agents" }} className="btn large">Connect your agent</Link>}
                   </div>
-                  <Command text="uv run catchbunny scan http://localhost:3000" />
+                  <Command text="catchbunny scan http://localhost:3000" />
                 </div>
               </div>
               <RunStage />
@@ -229,7 +229,7 @@ export function LandingPage() {
                   <Link to="/docs/agents" className="btn large">Connect a coding agent</Link>
                 </div>
               </div>
-              <Code label="Install and scan" text={"uv sync && uv run playwright install chromium --only-shell\nuv run catchbunny scan http://localhost:3000"} />
+              <Code label="Install and scan" text={"uv tool install git+https://github.com/cpldxx/catchbunny\ncatchbunny scan http://localhost:3000"} />
             </div>
           </section>
         </main>

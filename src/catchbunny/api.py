@@ -44,7 +44,10 @@ from .engine.orchestrator import App
 from .engine.scenarios import finding_to_scenario, fix_prompt, playwright_test, scenario_from_yaml, scenario_to_yaml
 from .engine.triage import rank
 
-WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+# The built site: in a checkout it is web/dist, rebuilt by `npm run build`; in an installed copy it was
+# packed into the package as catchbunny/web (see pyproject.toml), so `catchbunny serve` has its console.
+_CHECKOUT_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+WEB_DIST = _CHECKOUT_DIST if (_CHECKOUT_DIST / "index.html").is_file() else Path(__file__).resolve().parent / "web"
 TERMINAL = {RunStatus.PASSED, RunStatus.FAILED, RunStatus.BLOCKED, RunStatus.CANCELED, RunStatus.ERROR}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 COOKIE = "catchbunny_session"

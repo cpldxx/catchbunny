@@ -1,5 +1,6 @@
 """`catchbunny` command line: the same engine as the API, in-process.
 
+    catchbunny demo                                      # a small shop with bugs planted in it, to try this on
     catchbunny scan     http://localhost:3000            # swarm bug hunt
     catchbunny discover http://localhost:3000            # map the app, draft scenarios
     catchbunny run      --url http://localhost:3000 scenarios/*.yaml
@@ -97,7 +98,6 @@ async def _run(app: App, project: Project, spec: RunSpec, args: argparse.Namespa
     return EXIT.get(run.status, 2)
 
 
-AGENT_COMMANDS = ("mcp", "connect", "doctor")
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
 
 
@@ -115,6 +115,44 @@ async def _browser_starts(settings: Settings, engine: str = "chromium") -> str:
     return ""
 
 
+def _missing(problem: str) -> bool:
+    """Whether a launch failed because the browser was never downloaded, rather than for some other reason."""
+    return "Executable doesn't exist" in problem or "playwright install" in problem
+
+
+def _install_browser(settings: Settings, engine: str) -> None:
+    # Headless Chromium needs only its headless shell, about half the download of the whole browser.
+    shell = ["--only-shell"] if engine == "chromium" and settings.headless else []
+    subprocess.run([sys.executable, "-m", "playwright", "install", engine, *shell], check=False, stdout=sys.stderr)
+
+
+async def _ensure_browser(settings: Settings, engine: str) -> str:
+    """Download the engine the first time it is needed, so a new install works on its first command.
+    Empty when the browser starts, else why it does not."""
+    problem = await _browser_starts(settings, engine)
+    if problem and _missing(problem):
+        _say(f"First run: downloading the {engine} browser that Catchbunny tests with (once, about 100 MB).")
+        _install_browser(settings, engine)
+        problem = await _browser_starts(settings, engine)
+    return problem
+
+
+async def _demo(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from .demo_shop import BUGS, PASSWORD, USER, create_shop, parse_bugs
+
+    bugs = parse_bugs(args.bugs)
+    url = f"http://127.0.0.1:{args.port}"
+    _say(f"Mug & Co, the demo shop      {url}   ({len(bugs)} of {len(BUGS)} bugs planted)")
+    _say("  In another terminal, point Catchbunny at it:")
+    _say(f"    catchbunny scan {url} --user {USER} --password {PASSWORD}")
+    _say("  Stop it with Ctrl+C.")
+    config = uvicorn.Config(create_shop(bugs), host="127.0.0.1", port=args.port, log_level="warning")
+    await uvicorn.Server(config).serve()
+    return 0
+
+
 async def _doctor(settings: Settings, install: bool, engines: list[str] | None = None) -> int:
     """Whether this machine can run a scan. Chromium is what a scan uses unless told otherwise, so it is
     the one that decides the exit code; the other engines are reported when asked for."""
@@ -128,8 +166,8 @@ async def _doctor(settings: Settings, install: bool, engines: list[str] | None =
     for engine in wanted:
         problem = await _browser_starts(settings, engine)
         if problem and install:
-            _say(f"{engine:<16}missing; installing it for Playwright (once, 80 to 150 MB)")
-            subprocess.run([sys.executable, "-m", "playwright", "install", engine], check=False, stdout=sys.stderr)
+            _say(f"{engine:<16}missing; installing it for Playwright (once, about 100 MB)")
+            _install_browser(settings, engine)
             problem = await _browser_starts(settings, engine)
         if problem:
             problems[engine] = problem
@@ -193,6 +231,8 @@ async def _serve(settings: Settings, args: argparse.Namespace) -> int:
     except OSError:
         _say(f"Port {args.port} is already in use. Another Catchbunny may be running there: stop it, or choose another port with --port.")
         return 2
+    if problem := await _ensure_browser(settings, settings.browser):
+        _say(f"Warning: the {settings.browser} browser cannot start ({problem}). The console will open, but runs will not. Check with: catchbunny doctor")
     serving = Serving(team=team, public_url=public, local_only=not team)
     core = App(settings)
     if not WEB_DIST.is_dir():
@@ -229,10 +269,6 @@ async def _main(args: argparse.Namespace) -> int:
     settings = Settings()
     if args.data_dir:
         settings.data_dir = Path(args.data_dir)
-    elif args.command in AGENT_COMMANDS and "CATCHBUNNY_DATA_DIR" not in os.environ:
-        # An agent starts the server from whatever folder it is working in. Findings have to be there
-        # in the next session and the next project, so they live in one place, not in each folder.
-        settings.data_dir = Path.home() / ".catchbunny"
     if args.command == "doctor":
         return await _doctor(settings, install=args.install_browser, engines=list(BROWSERS) if args.browser == "all" else [args.browser])
     if args.command == "connect":
@@ -244,6 +280,11 @@ async def _main(args: argparse.Namespace) -> int:
         return code
     if args.command == "serve":
         return await _serve(settings, args)
+    if args.command == "demo":
+        return await _demo(args)
+    if args.command in ("scan", "discover", "run") and (problem := await _ensure_browser(settings, args.browser)):
+        _say(f"The {args.browser} browser cannot start: {problem}\nCheck with: catchbunny doctor --browser {args.browser}")
+        return 2
     if args.command == "mcp":
         if args.http:
             return await _serve_mcp_http(settings, args)
@@ -309,7 +350,7 @@ async def _main(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="catchbunny", description="Autonomous QA swarm for web apps.")
-    p.add_argument("--data-dir", default="", help="where the database and artifacts live (default .catchbunny)")
+    p.add_argument("--data-dir", default="", help="where runs, findings and recordings are kept (default ~/.catchbunny)")
     sub = p.add_subparsers(dest="command", required=True)
 
     def target(sp: argparse.ArgumentParser) -> None:
@@ -339,6 +380,10 @@ def main(argv: list[str] | None = None) -> None:
         sp.add_argument("--screenshots", default="on_signal", choices=["on_signal", "every_step", "off"])
         sp.add_argument("--knowledge", default="", help="product notes for the testers")
         target(sp)
+
+    sp = sub.add_parser("demo", help="start the demo shop, a small store with bugs planted in it, to try Catchbunny on")
+    sp.add_argument("--port", type=int, default=8811)
+    sp.add_argument("--bugs", default="all", help="all, none, or a comma list of the planted bugs")
 
     sp = sub.add_parser("run", help="run scenario files")
     sp.add_argument("files", nargs="+")
