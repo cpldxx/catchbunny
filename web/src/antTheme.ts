@@ -1,0 +1,78 @@
+// Ant Design, themed from the tokens. Only the console imports this, so the landing
+// page and the docs do not carry the component library.
+
+import { theme, type ThemeConfig } from "antd";
+import { ease, fonts, palette } from "./theme";
+
+const lifted = "#1f3027"; // one step above `raised`: a hovered control, a tooltip
+const popover = "#15211b";
+
+export const antTheme: ThemeConfig = {
+  algorithm: theme.darkAlgorithm,
+  token: {
+    // The primary action is the moon, with the ground's own dark as its ink.
+    colorPrimary: palette.accent,
+    colorInfo: palette.text,
+    colorLink: palette.text,
+    colorTextLightSolid: palette["accent-ink"],
+    colorSuccess: palette.positive,
+    colorError: palette.negative,
+    colorWarning: palette.caution,
+    colorBgBase: palette.page,
+    colorBgLayout: palette.page,
+    colorBgContainer: palette.card,
+    colorBgElevated: popover,
+    colorTextBase: palette.text,
+    colorText: palette.text,
+    colorTextSecondary: palette.secondary,
+    colorTextTertiary: palette.muted,
+    colorTextQuaternary: "#5c6b5f",
+    colorTextPlaceholder: palette.muted,
+    colorBorder: palette["hairline-strong"],
+    colorBorderSecondary: palette.hairline,
+    colorSplit: palette.hairline,
+    colorFillSecondary: palette.raised,
+    colorFillTertiary: palette.raised,
+    colorFillQuaternary: palette.hover,
+    fontFamily: fonts.ui,
+    fontFamilyCode: fonts.mono,
+    fontSize: 14,
+    lineHeight: 20 / 14,
+    borderRadius: 8,
+    borderRadiusSM: 6,
+    borderRadiusLG: 12,
+    borderRadiusXS: 4,
+    controlHeight: 36,
+    controlHeightSM: 28,
+    controlHeightLG: 44,
+    motionEaseOut: ease,
+    motionEaseInOut: ease,
+    motionEaseOutCirc: ease,
+    motionEaseInOutCirc: ease,
+    motionDurationFast: "0.12s",
+    motionDurationMid: "0.16s",
+    motionDurationSlow: "0.24s",
+    boxShadow: "none",
+    boxShadowSecondary: `0 0 0 1px ${palette.hairline}, 0 16px 40px rgba(2, 6, 4, 0.6)`,
+    boxShadowTertiary: "none",
+  },
+  components: {
+    Button: { fontWeight: 600, primaryShadow: "none", defaultShadow: "none", dangerShadow: "none", defaultBg: palette.raised, defaultBorderColor: palette.hairline, defaultHoverBg: lifted, defaultHoverBorderColor: palette["hairline-strong"], defaultHoverColor: palette.text, defaultActiveBg: lifted, defaultActiveBorderColor: palette["hairline-strong"], defaultActiveColor: palette.text, paddingInline: 16 },
+    Input: { colorBgContainer: palette.raised, activeShadow: "none", hoverBorderColor: palette["hairline-strong"], activeBorderColor: palette.accent, colorBorder: palette.hairline },
+    InputNumber: { colorBgContainer: palette.raised, activeShadow: "none", hoverBorderColor: palette["hairline-strong"], activeBorderColor: palette.accent, colorBorder: palette.hairline },
+    Select: { colorBgContainer: palette.raised, selectorBg: palette.raised, colorBorder: palette.hairline, hoverBorderColor: palette["hairline-strong"], activeBorderColor: palette.accent, activeOutlineColor: "transparent", optionSelectedBg: palette.raised, optionActiveBg: palette.raised, optionSelectedFontWeight: 600, optionSelectedColor: palette.text },
+    Table: { headerBg: "transparent", headerColor: palette.muted, headerSplitColor: "transparent", rowHoverBg: palette.raised, borderColor: palette.hairline, colorBgContainer: "transparent", cellPaddingBlock: 12, cellPaddingInline: 16, rowSelectedBg: palette.raised, rowSelectedHoverBg: palette.raised, fontWeightStrong: 600 },
+    Segmented: { trackBg: palette.deep, itemSelectedBg: palette.raised, itemSelectedColor: palette.text, itemColor: palette.secondary, itemHoverColor: palette.text, itemHoverBg: "transparent", trackPadding: 4 },
+    Tabs: { inkBarColor: palette.accent, itemColor: palette.secondary, itemSelectedColor: palette.text, itemHoverColor: palette.text, itemActiveColor: palette.text, titleFontSize: 14, horizontalItemPadding: "8px 0", horizontalItemGutter: 24 },
+    Drawer: { colorBgElevated: palette.card, paddingLG: 24, colorSplit: palette.hairline },
+    Modal: { contentBg: palette.card, headerBg: palette.card, titleFontSize: 16 },
+    Form: { labelColor: palette.text, verticalLabelPadding: "0 0 8px", itemMarginBottom: 20, labelFontSize: 14 },
+    Tooltip: { colorBgSpotlight: lifted, colorTextLightSolid: palette.text },
+    Slider: { railBg: palette.raised, railHoverBg: palette.raised, trackBg: palette.secondary, trackHoverBg: palette.accent, handleColor: palette.accent, handleActiveColor: palette.accent, dotBorderColor: palette.muted, dotActiveBorderColor: palette.accent, handleSize: 12, handleSizeHover: 12, railSize: 4 },
+    Switch: { handleBg: palette["accent-ink"], colorTextQuaternary: "#2c3d33", colorTextTertiary: "#37493e" },
+    Checkbox: { colorBgContainer: palette.raised, colorBorder: palette["hairline-strong"] },
+    Skeleton: { gradientFromColor: palette.raised, gradientToColor: lifted },
+    Message: { contentBg: lifted },
+    Popconfirm: { colorBgElevated: popover },
+  },
+};

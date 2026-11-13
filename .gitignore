@@ -1,0 +1,11 @@
+.venv/
+.catchbunny/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.catchbunny-dev/
+node_modules/
+.claude/
+.DS_Store
+*.bak

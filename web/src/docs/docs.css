@@ -1,0 +1,52 @@
+/* Documentation: the frame (rail, title, code, tables) carries the brand; the column stays calm.
+   Body 16/26 at a measure of about 70 characters. */
+
+.docs { flex: 1; display: grid; grid-template-columns: 208px minmax(0, 1fr) 192px; gap: 64px; width: 100%; padding-top: 56px; padding-bottom: 96px; align-items: start; }
+.docs-rail, .docs-here { position: sticky; top: 96px; display: grid; gap: 2px; align-content: start; }
+.docs-rail h2, .docs-here h2 { margin: 0 0 8px 12px; font: 600 13px/20px var(--font-ui); color: var(--muted); }
+.docs-rail a { display: flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 8px; color: var(--secondary); text-decoration: none; transition: background-color 0.16s var(--ease), color 0.16s var(--ease); }
+.docs-rail a:hover { color: var(--text); background: var(--hover); }
+.docs-rail a.active { color: var(--text); background: var(--raised); box-shadow: inset 2px 0 0 var(--accent); }
+.docs-here h2 { margin-left: 0; }
+.docs-here a { padding: 4px 0; font-size: 13px; color: var(--secondary); text-decoration: none; transition: color 0.16s var(--ease); }
+.docs-here a:hover { color: var(--text); }
+
+.doc { min-width: 0; max-width: 72ch; font-size: 16px; line-height: 26px; }
+.doc h1 { font-size: 40px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; }
+.doc-lead { margin-top: 12px; font-size: 18px; line-height: 28px; color: var(--secondary); }
+.doc h2 { margin: 48px 0 0; font: 600 20px/28px var(--font-ui); }
+.doc p, .doc ul, .doc ol, .doc-code, .doc-table, .doc-note { margin: 16px 0 0; }
+.doc ul, .doc ol { padding-left: 24px; }
+.doc li + li { margin-top: 8px; }
+.doc li::marker { color: var(--muted); }
+.doc code { padding: 2px 6px; border-radius: 4px; background: var(--raised); font-size: 14px; overflow-wrap: anywhere; }
+.doc-code { position: relative; border: 1px solid var(--hairline); border-radius: 8px; background: var(--deep); }
+.doc-code pre { margin: 0; padding: 16px 96px 16px 16px; font: 400 14px/22px var(--font-mono); font-variation-settings: "MONO" 1; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.doc-code .copy { position: absolute; top: 12px; right: 12px; }
+.doc-table { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 8px; }
+.doc-table table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 22px; }
+.doc-table th { padding: 10px 16px; text-align: left; font-weight: 400; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+.doc-table td { padding: 12px 16px; vertical-align: top; border-top: 1px solid var(--hairline); color: var(--secondary); }
+.doc-table tr:first-child td { border-top: 0; }
+.doc-table td:first-child { color: var(--text); white-space: nowrap; }
+.doc-table td code { white-space: nowrap; }
+.doc-note { padding: 14px 16px; border: 1px solid var(--hairline-strong); border-radius: 8px; background: var(--card); color: var(--secondary); }
+.doc-next { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.doc-next a { display: grid; gap: 4px; padding: 16px; border: 1px solid var(--hairline); border-radius: 12px; color: var(--text); font-weight: 600; text-decoration: none; transition: border-color 0.16s var(--ease), background-color 0.16s var(--ease); }
+.doc-next a:hover { border-color: var(--hairline-strong); background: var(--card); }
+.doc-next a span { font-weight: 400; font-size: 13px; color: var(--muted); }
+.doc-next .forward { text-align: right; }
+
+@media (max-width: 1180px) {
+  .docs { grid-template-columns: 208px minmax(0, 1fr); gap: 48px; }
+  .docs-here { display: none; }
+}
+@media (max-width: 860px) {
+  .docs { grid-template-columns: 1fr; gap: 24px; padding-top: 24px; padding-bottom: 64px; }
+  .docs-rail { position: static; display: flex; gap: 4px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 8px; scrollbar-width: none; }
+  .docs-rail h2 { display: none; }
+  .docs-rail a { flex: none; white-space: nowrap; }
+  .docs-rail a.active { box-shadow: none; }
+  .doc h1 { font-size: 32px; line-height: 36px; }
+  .doc-code pre { padding-right: 16px; padding-top: 48px; }
+}
