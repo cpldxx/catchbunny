@@ -188,8 +188,8 @@ async def _try(settings: Settings, args: argparse.Namespace) -> int:
             return 2
         await asyncio.sleep(0.05)
 
-    _say(f"{f'Mug & Co, a shop with {len(BUGS)} bugs planted in it':<44}{shop_url}")
-    _say(f"{'The console, where you can watch the testers':<44}{console_url}/app")
+    _say(f"{f'Mug & Co, a shop with {len(BUGS)} bugs planted in it':<47}{shop_url}")
+    _say(f"{'The console, where you can watch the testers':<47}{console_url}/app")
     project = await ensure_project(core, shop_url, user=USER, password=PASSWORD)
     spec = RunSpec(kind=RunKind.DEEP_SCAN, brain=args.brain, testers=6, devices=["desktop", "iphone"], max_steps=500, max_minutes=5)
     run = await core.runs.start(project, spec)
