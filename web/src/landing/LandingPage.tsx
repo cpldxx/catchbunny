@@ -67,7 +67,7 @@ export function LandingPage() {
                     <Link to="/docs/quick-start" className="btn primary large">Run your first scan</Link>
                     {door ? <Link to={door.to} className="btn large">{door.label}</Link> : <Link to={{ pathname: "/", hash: "#agents" }} className="btn large">Connect your agent</Link>}
                   </div>
-                  <Command text="catchbunny scan http://localhost:3000" />
+                  <Command text="curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh" />
                 </div>
               </div>
               <RunStage />
@@ -229,7 +229,10 @@ export function LandingPage() {
                   <Link to="/docs/agents" className="btn large">Connect a coding agent</Link>
                 </div>
               </div>
-              <Code label="Install and scan" text={"uv tool install git+https://github.com/cpldxx/catchbunny\ncatchbunny scan http://localhost:3000"} />
+              <div className="install-steps">
+                <Code label="Install" text="curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh" />
+                <Code label="Then, in a new terminal, see it work" text="catchbunny try" />
+              </div>
             </div>
           </section>
         </main>

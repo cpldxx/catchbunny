@@ -361,6 +361,7 @@ pre.code { margin: 0; padding: 16px; background: var(--deep); border: 1px solid 
 .door-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .door-card .ant-input.mono { font-family: var(--font-mono); font-variation-settings: "MONO" 1; letter-spacing: 0.04em; }
 .no-server { max-width: 640px; margin-bottom: 24px; }
+.install-steps { display: grid; gap: 16px; min-width: 0; }
 
 /* ---------------------------------------------------------------- team and agents */
 

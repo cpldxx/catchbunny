@@ -141,9 +141,12 @@ export function NoServerPage() {
           <h1 className="display">The console runs where Catchbunny runs</h1>
           <p>This is a copy of the site with no Catchbunny server behind it. Install it, start it, and the console opens on your own machine, with your own runs in it.</p>
           <div className="no-server">
-            <Code label="Install and start" text={"uv tool install git+https://github.com/cpldxx/catchbunny\ncatchbunny serve"} />
+            <div className="install-steps">
+              <Code label="Install" text="curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh" />
+              <Code label="Then, in a new terminal, see it work" text="catchbunny try" />
+            </div>
           </div>
-          <p>Then open <code translate="no">http://127.0.0.1:8700/app</code>.</p>
+          <p>The second command starts a shop with bugs planted in it, scans it, and opens the console on that scan. After that, <code translate="no">catchbunny serve</code> opens the console on its own.</p>
           <div className="actions">
             <Link to="/docs/quick-start" className="btn primary">Read the quick start</Link>
             <Link to="/docs/teams" className="btn">Run it for a team</Link>

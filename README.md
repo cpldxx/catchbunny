@@ -21,41 +21,27 @@ It is an [MCP server](#use-it-from-a-coding-agent-mcp): Claude Code, Codex, Clau
 
 ## Quick start
 
-Every block below can be pasted as it is. Tested on macOS; Linux should work the same way, Windows has not been tried.
+Two commands. Tested on macOS; Linux should work the same way; Windows has not been tried.
 
-If you do not have [uv](https://docs.astral.sh/uv/) yet, install it, then open a new terminal:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Install Catchbunny. uv fetches the Python it needs; the browser it tests with is downloaded on first use, once.
+Install it. This installs [uv](https://docs.astral.sh/uv/) if you do not have it, then Catchbunny, then the browser it tests with ([what the script does](install.sh)):
 
 ```bash
-uv tool install git+https://github.com/cpldxx/catchbunny
+curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh
 ```
 
-If the next command says `catchbunny: command not found`, run `uv tool update-shell` and open a new terminal.
-
-Start the demo shop, a small store with bugs planted in it. It runs until you stop it with Ctrl+C:
+Then open a new terminal, so it finds the command the installer just added, and see it work. This starts a small shop with bugs planted in it, scans it, and opens the console on that scan so you can watch the testers:
 
 ```bash
-catchbunny demo
+catchbunny try
 ```
 
-In a second terminal, scan it:
+Then your own app, while it is running:
 
 ```bash
-catchbunny scan http://127.0.0.1:8811 --user demo --password demo-pass
+catchbunny scan http://localhost:3000
 ```
 
-Open the console, which shows that scan and every run after it:
-
-```bash
-catchbunny serve
-```
-
-Then open http://127.0.0.1:8700/app. Your own app is the same with its own address: `catchbunny scan http://localhost:3000`.
+Already have uv? `uv tool install git+https://github.com/cpldxx/catchbunny` does the same as the script; the browser is then downloaded on first use. Running the script again updates Catchbunny.
 
 | More | |
 |---|---|
@@ -67,7 +53,8 @@ Then open http://127.0.0.1:8700/app. Your own app is the same with its own addre
 | `catchbunny run --url <url> checkout.yaml` | Run it: exit code 1 while the bug exists |
 | `catchbunny connect claude-code codex` | Let those agents start Catchbunny themselves ([below](#use-it-from-a-coding-agent-mcp)) |
 | `catchbunny serve --team --public-url https://qa.example.com` | The same server for a team ([below](#serve-it-for-a-team)) |
-| `uv tool install --reinstall git+https://github.com/cpldxx/catchbunny` | Update to the latest version |
+| `catchbunny demo` and `catchbunny serve` | The shop on its own, and the console on its own (http://127.0.0.1:8700/app) |
+| `curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh` | Update to the latest version (the same line again) |
 
 Runs, findings and recordings are kept in `~/.catchbunny`, whoever starts them.
 
