@@ -3,11 +3,11 @@
 Every bug is behind a flag, so the same app is both the buggy build and the
 fixed build:
 
-    catchbunny demo                          # every bug on, at http://127.0.0.1:8811
-    catchbunny demo --port 8812 --bugs none  # the fixed build
+    python -m catchbunny.demo_shop                          # every bug on, at http://127.0.0.1:8811
+    python -m catchbunny.demo_shop --port 8812 --bugs none  # the fixed build
 
 It lives in the package, not beside it, so that an installed copy can start it:
-the first thing a new user does is point Catchbunny at something with bugs in it.
+the console offers it to scan when there is nothing else to test yet.
 
 It also contains *traps*: correct behaviour that a naive tool reports as a bug
 (a 401 on a wrong password, a 422 on bad input, a "Copy link" button whose only
@@ -398,6 +398,63 @@ def parse_bugs(spec: str) -> set[str]:
     if spec in ("none", ""):
         return set()
     return {b.strip() for b in spec.split(",") if b.strip() in BUGS}
+
+
+def free_port(preferred: int) -> int:
+    """`preferred` if nothing is listening there, else any free port."""
+    import socket
+
+    for port in (preferred, 0):
+        with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # as the server will: a port just let go of is free
+            try:
+                probe.bind(("127.0.0.1", port))
+                return int(probe.getsockname()[1])
+            except OSError:
+                continue
+    raise OSError("no free port on 127.0.0.1")
+
+
+class Running:
+    """The shop inside a server that is already running: started the first time someone asks
+    for it (the console's "scan the demo shop"), and stopped with that server."""
+
+    def __init__(self, preferred_port: int = 8811) -> None:
+        self.preferred_port = preferred_port
+        self.url = ""
+        self._server: Any = None
+        self._task: asyncio.Task[None] | None = None
+        self._lock = asyncio.Lock()
+
+    async def start(self) -> str:
+        import contextlib
+
+        import uvicorn
+
+        class Server(uvicorn.Server):
+            @contextlib.contextmanager
+            def capture_signals(self):  # type: ignore[no-untyped-def,override]
+                yield  # Ctrl+C belongs to the server this runs inside, which stops the shop on its way out
+
+        async with self._lock:
+            if self._task is not None and not self._task.done():
+                return self.url
+            port = free_port(self.preferred_port)
+            server = Server(uvicorn.Config(create_shop(parse_bugs("all")), host="127.0.0.1", port=port, log_level="warning"))
+            task = asyncio.create_task(server.serve())
+            while not server.started:
+                if task.done():
+                    raise RuntimeError("The demo shop could not start: no port was free for it.")
+                await asyncio.sleep(0.05)
+            self._server, self._task, self.url = server, task, f"http://127.0.0.1:{port}"
+            return self.url
+
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+        self._server.should_exit = True
+        await asyncio.gather(self._task, return_exceptions=True)
+        self._task = None
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -82,7 +82,7 @@ export function ScenariosPage() {
         {open && (
           <>
             <ol className="steps" style={{ marginBottom: 24 }}>{open.steps.map((s, i) => <li key={i}><span>{s}</span></li>)}</ol>
-            <p className="muted" style={{ marginBottom: 8 }}>The same scenario as a file. Commit it and run it with <code>catchbunny run</code>.</p>
+            <p className="muted" style={{ marginBottom: 8 }}>The same scenario as a file, to keep with your code.</p>
             <pre className="code">{yaml.data ?? ""}</pre>
           </>
         )}

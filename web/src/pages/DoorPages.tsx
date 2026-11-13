@@ -143,10 +143,10 @@ export function NoServerPage() {
           <div className="no-server">
             <div className="install-steps">
               <Code label="Install" text="curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh" />
-              <Code label="Then, in a new terminal, see it work" text="catchbunny try" />
+              <Code label="Then, in a new terminal, open it" text="catchbunny start" />
             </div>
           </div>
-          <p>The second command starts a shop with bugs planted in it, scans it, and opens the console on that scan. After that, <code translate="no">catchbunny serve</code> opens the console on its own.</p>
+          <p>The second command opens the console in your browser. Add the address of your app there, or scan the demo shop that comes with it.</p>
           <div className="actions">
             <Link to="/docs/quick-start" className="btn primary">Read the quick start</Link>
             <Link to="/docs/teams" className="btn">Run it for a team</Link>

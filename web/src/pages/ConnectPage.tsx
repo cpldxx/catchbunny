@@ -57,14 +57,14 @@ function How({ agent, meta }: { agent: Agent; meta: Meta }) {
       return (
         <>
           <Lines label="Run this in the project you are working on" text={`claude mcp add --transport http catchbunny ${url}${team ? ` \\\n  --header "Authorization: Bearer ${key}"` : ""}`} />
-          <p className="faint">{team ? <>Or leave the header out and run <code>/mcp</code> inside Claude Code: it opens this server’s sign-in page in your browser.</> : <>To let Claude Code start Catchbunny itself instead, with no server running, use <code>catchbunny connect claude-code</code>.</>}</p>
+          <p className="faint">{team ? <>Or leave the header out and run <code>/mcp</code> inside Claude Code: it opens this server’s sign-in page in your browser.</> : <>Or run <code>catchbunny connect</code>, which does this for Claude Code and Codex at once.</>}</p>
         </>
       );
     case "codex":
       return (
         <>
           <Lines label="Run this once" text={`codex mcp add catchbunny --url ${url}${team ? " --bearer-token-env-var CATCHBUNNY_KEY" : ""}`} />
-          <p className="faint">{team ? <>Codex reads the key from the environment variable <code>CATCHBUNNY_KEY</code>, so it is never written into its config file.</> : <>To let Codex start Catchbunny itself instead, use <code>catchbunny connect codex</code>.</>}</p>
+          <p className="faint">{team ? <>Codex reads the key from the environment variable <code>CATCHBUNNY_KEY</code>, so it is never written into its config file.</> : <>Or run <code>catchbunny connect</code>, which does this for Claude Code and Codex at once.</>}</p>
         </>
       );
     default: {

@@ -1,7 +1,7 @@
 """People and their keys: what turns a tool on one desk into one a team shares.
 
 Catchbunny on your own machine has no accounts: it listens on localhost and
-whoever can reach localhost is you. Served to a team (`catchbunny serve --team`)
+whoever can reach localhost is you. Served to a team (`catchbunny start --team`)
 it needs to know who is asking, so this module keeps:
 
     the team       one per server: its name and the code a colleague joins with

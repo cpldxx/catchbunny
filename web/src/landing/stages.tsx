@@ -400,11 +400,11 @@ const TOOLS: { id: keyof typeof demo.agent; call: string; says: string }[] = [
 
 /** How an agent is connected. MCP comes first because it is what all the others are: the protocol, then who speaks it. */
 const AGENTS = [
-  { name: "MCP", run: "catchbunny serve", note: "Any MCP client can use the endpoint it serves at /mcp" },
-  { name: "Claude Code", run: "catchbunny connect claude-code", note: "Writes .mcp.json in the project you are in" },
-  { name: "Codex", run: "catchbunny connect codex", note: "Adds one table to ~/.codex/config.toml" },
-  { name: "Claude", run: "catchbunny serve --team --public-url https://qa.yourcompany.com", note: "Add its /mcp address as a custom connector, then sign in" },
-  { name: "ChatGPT", run: "catchbunny serve --team --public-url https://qa.yourcompany.com", note: "Add its /mcp address as an MCP server, then sign in" },
+  { name: "MCP", run: "catchbunny start", note: "Any MCP client can use the endpoint it serves at /mcp" },
+  { name: "Claude Code", run: "claude mcp add --transport http catchbunny http://127.0.0.1:8700/mcp", note: "Or catchbunny connect, which finds Claude Code and Codex and adds it to both" },
+  { name: "Codex", run: "codex mcp add catchbunny --url http://127.0.0.1:8700/mcp", note: "Or catchbunny connect, which finds Claude Code and Codex and adds it to both" },
+  { name: "Claude", run: "catchbunny start --team --public-url https://qa.yourcompany.com", note: "Add its /mcp address as a custom connector, then sign in" },
+  { name: "ChatGPT", run: "catchbunny start --team --public-url https://qa.yourcompany.com", note: "Add its /mcp address as an MCP server, then sign in" },
 ];
 
 /** What a coding agent sends and what it gets back, for this run. */

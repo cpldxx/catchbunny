@@ -1,4 +1,4 @@
-// The HTTP API of `catchbunny serve`, typed. Shapes mirror src/catchbunny/domain.py.
+// The HTTP API of `catchbunny start`, typed. Shapes mirror src/catchbunny/domain.py.
 
 export type Severity = "P0" | "P1" | "P2" | "P3";
 export type RunStatus = "queued" | "running" | "passed" | "failed" | "blocked" | "canceled" | "error";
@@ -105,7 +105,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
   } catch {
-    throw new ApiError(0, "The Catchbunny server is not answering. Start it with `catchbunny serve`.");
+    throw new ApiError(0, "The Catchbunny server is not answering. Start it with `catchbunny start`.");
   }
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
@@ -141,6 +141,7 @@ export const api = {
   answerConnector: (id: string, approve: boolean) => post<{ redirect_to: string }>(`/v1/oauth/requests/${id}`, { approve }),
   models: () => http<Models>("/v1/models"),
   projects: () => http<Project[]>("/v1/projects"),
+  scanDemo: () => post<{ project_id: string; run_id: string; url: string; planted: number }>("/v1/demo"),
   project: (id: string) => http<Project>(`/v1/projects/${id}`),
   createProject: (p: NewProject) =>
     post<Project>("/v1/projects", {

@@ -21,42 +21,39 @@ It is an [MCP server](#use-it-from-a-coding-agent-mcp): Claude Code, Codex, Clau
 
 ## Quick start
 
-Two commands. Tested on macOS; Linux should work the same way; Windows has not been tried.
+Install it, start it, and the console opens in your browser. Nothing goes into your app: no SDK and no code. Catchbunny needs only its address. Tested on macOS; Linux should work the same way; Windows has not been tried.
 
-Install it. This installs [uv](https://docs.astral.sh/uv/) if you do not have it, then Catchbunny, then the browser it tests with ([what the script does](install.sh)):
+**1. Install.** This installs [uv](https://docs.astral.sh/uv/) if you do not have it, then Catchbunny, then the browser it tests with ([what the script does](install.sh)). Running it again updates Catchbunny.
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh
 ```
 
-Then open a new terminal, so it finds the command the installer just added, and see it work. This starts a small shop with bugs planted in it, scans it, and opens the console on that scan so you can watch the testers:
+**2. Start it,** in a new terminal so it finds the command the installer just added. The console opens at http://127.0.0.1:8700/app, and the MCP endpoint for coding agents is at `/mcp` on the same port.
 
 ```bash
-catchbunny try
+catchbunny start
 ```
 
-Then your own app, while it is running:
+**3. Test an app.** In the console, choose **Add an app** and enter the address of an app that is running, such as `http://localhost:3000`. No app running yet? Choose **Scan the demo shop**: a small store with bugs planted in it starts beside Catchbunny, and six testers scan it while you watch.
+
+**4. Connect your coding agent** (optional). This finds Claude Code and Codex on this machine and points both at the MCP endpoint:
 
 ```bash
-catchbunny scan http://localhost:3000
+catchbunny connect
 ```
 
-Already have uv? `uv tool install git+https://github.com/cpldxx/catchbunny` does the same as the script; the browser is then downloaded on first use. Running the script again updates Catchbunny.
+That is all of it. Three commands:
 
-| More | |
+| Command | What it does |
 |---|---|
-| `catchbunny scan <url> --browser webkit` | Test in the engine Safari is built on (downloaded the first time) |
-| `catchbunny scan <url> --devices desktop,iphone` | A phone as well as a desktop |
-| `catchbunny scan <url> --brain claude` | Claude-driven testers on top of the detectors (needs `ANTHROPIC_API_KEY`) |
-| `catchbunny scan <url> --brain ollama --model <tag>` | The same on a model on your own machine |
-| `catchbunny export <finding-id> --format scenario -o checkout.yaml` | Keep a finding as a regression test (or `playwright`, `prompt`) |
-| `catchbunny run --url <url> checkout.yaml` | Run it: exit code 1 while the bug exists |
-| `catchbunny connect claude-code codex` | Let those agents start Catchbunny themselves ([below](#use-it-from-a-coding-agent-mcp)) |
-| `catchbunny serve --team --public-url https://qa.example.com` | The same server for a team ([below](#serve-it-for-a-team)) |
-| `catchbunny demo` and `catchbunny serve` | The shop on its own, and the console on its own (http://127.0.0.1:8700/app) |
-| `curl -LsSf https://raw.githubusercontent.com/cpldxx/catchbunny/main/install.sh | sh` | Update to the latest version (the same line again) |
+| `catchbunny start` | The console in your browser, the API and the MCP endpoint, on port 8700. `--team --public-url https://qa.example.com` serves it [for a team](#serve-it-for-a-team) |
+| `catchbunny scan <url>` | Scan a running app from the terminal or CI, without the console. Exit code 0 passed, 1 a confirmed finding at or above the gate, 2 could not test |
+| `catchbunny connect` | Point Claude Code and Codex at the MCP endpoint ([below](#use-it-from-a-coding-agent-mcp)) |
 
-Runs, findings and recordings are kept in `~/.catchbunny`, whoever starts them.
+`catchbunny <command> --help` lists the options: `scan` takes `--user`/`--password` for a test account, `--browser webkit` for the engine Safari is built on, `--devices desktop,iphone`, and `--brain claude` (with `ANTHROPIC_API_KEY`) or `--brain ollama --model <tag>` for model-driven testers. Runs, findings and recordings are kept in `~/.catchbunny`, whoever starts them, so the console shows a scan from the terminal or an agent too.
+
+Already have uv? `uv tool install git+https://github.com/cpldxx/catchbunny` does the same as the script; the browser is then downloaded on first use.
 
 ### From a checkout
 
@@ -213,7 +210,15 @@ Catchbunny is an MCP server, so an agent that has just changed your code can tes
 
 ### The endpoint
 
-`catchbunny serve` serves MCP over Streamable HTTP at `/mcp`, on the same port as the console. Any MCP client can use it. On your own machine it needs no key, because the server answers only requests addressed to localhost.
+`catchbunny start` serves MCP over Streamable HTTP at `http://127.0.0.1:8700/mcp`, on the same port as the console. Any MCP client can use it. On your own machine it needs no key, because the server answers only requests addressed to localhost. Because the agent talks to the same server as the console, a scan it starts shows in the console as it happens.
+
+### Claude Code and Codex
+
+```bash
+catchbunny connect
+```
+
+It finds Claude Code and Codex on this machine and points each at the endpoint; name one to connect only that (`catchbunny connect codex`). Or use the agent's own command:
 
 ```bash
 claude mcp add --transport http catchbunny http://127.0.0.1:8700/mcp
@@ -223,43 +228,23 @@ claude mcp add --transport http catchbunny http://127.0.0.1:8700/mcp
 codex mcp add catchbunny --url http://127.0.0.1:8700/mcp
 ```
 
-The console has a page for this, **Connect an agent**, which shows the command for each agent with this server's own address filled in, and on a team server makes the key.
+Then start your app and ask the agent: *"scan http://localhost:3000 with Catchbunny and fix what it finds."* The console's **Connect an agent** page shows the same commands with the server's own address filled in, and on a team server makes the key.
 
-### Or let the agent start it
-
-With no server running, an agent can start Catchbunny itself over stdio. These three steps are written so that an agent asked to "install Catchbunny" can follow them as they are.
-
-```bash
-uv tool install git+https://github.com/cpldxx/catchbunny
-```
-
-```bash
-catchbunny connect claude-code codex
-```
-
-```bash
-catchbunny doctor
-```
-
-The first puts a `catchbunny` command on the machine, in an environment of its own. The second registers the server with the agents you name and installs the browser if it is missing. The third says whether this machine can run a scan. Then start a new agent session, start your app, and ask: *"scan http://localhost:3000 with Catchbunny and fix what it finds."*
-
-| Agent | `catchbunny connect ...` | What it writes |
+| Agent | Name | Where it goes |
 |---|---|---|
-| Claude Code | `claude-code` | `.mcp.json` in the current project. Claude Code asks once to approve it. `--scope user` registers it for every project through the `claude` CLI |
-| Codex (CLI, IDE extension, desktop app) | `codex` | One `[mcp_servers.catchbunny]` table in `~/.codex/config.toml`; `--scope project` uses `.codex/config.toml` |
-| Claude Desktop | `claude-desktop` | One entry under `mcpServers` in `claude_desktop_config.json`. Quit Claude first: it rewrites that file while it runs, and `connect` refuses rather than race it |
+| Claude Code | `claude-code` | Added for every project through Claude Code's own `claude mcp add-json --scope user`. Without the `claude` command on `PATH`, `.mcp.json` in the current project |
+| Codex (CLI, IDE extension, desktop app) | `codex` | One `[mcp_servers.catchbunny]` table in `~/.codex/config.toml` |
+| Claude Desktop | `claude-desktop` | One entry under `mcpServers` in `claude_desktop_config.json`, which starts Catchbunny itself (that file takes commands, not addresses). Named only, never found automatically; quit Claude first: it rewrites that file while it runs, and `connect` refuses rather than race it |
 
-`connect` touches one entry named `catchbunny` and nothing else in the file: other servers, comments and ordering stay as they were, the previous file is kept as `.bak`, a file that does not parse is left alone, `--print` shows the entry without writing, and `--remove` takes it out. The path it writes is absolute, because an app started from the dock does not have your shell's `PATH`.
+`connect` touches one entry named `catchbunny` and nothing else in the file: other servers, comments and ordering stay as they were, the previous file is kept as `.bak`, a file that does not parse is left alone, `--print` shows the entry without writing, and `--remove` takes it out.
 
-Started by an agent, the server keeps its records in `~/.catchbunny`, like everything else (not in whichever folder the agent happens to be in), so a finding from yesterday's session can be re-checked today, and the console shows the scans an agent ran. Several sessions can share that directory: each run records the process that owns it, so a server starting up does not mistake another server's run for one that died.
+With `--stdio`, the agent starts a Catchbunny of its own over stdio instead, so nothing needs to be running. The command it writes is an absolute path, because an app started from the dock does not have your shell's `PATH`. That server keeps its records in `~/.catchbunny` too, so the console lists its runs. Several servers can share that directory: each run records the process that owns it, so a server starting up does not mistake another server's run for one that died.
 
 ### Claude and ChatGPT
 
 Their connectors reach a server over the internet, from the vendor's servers, so they need an address with HTTPS. [Serve Catchbunny for a team](#serve-it-for-a-team) and add `https://<your address>/mcp` as a custom connector (Claude: Customize > Connectors > Add > Add custom connector). The connector finds the server's OAuth metadata, registers itself, and sends you to your own server to sign in and allow it. No token is pasted anywhere.
 
-For one person without a team server, `catchbunny mcp --http --token auto` still serves the same tools behind one token, to put behind a tunnel: the token goes in an `Authorization: Bearer` header, or as the first part of the path (`https://<host>/<token>/mcp`) for a client that takes only a URL.
-
-Scans are made **from the machine Catchbunny is on**: `http://localhost:3000` in a scan is that machine's own dev server. Whoever can use the endpoint can make that machine open any address it can reach, so nothing but localhost is answered without a sign-in or a key, and `--host 0.0.0.0` without `--team` (or without a token, for `catchbunny mcp --http`) is refused.
+Scans are made **from the machine Catchbunny is on**: `http://localhost:3000` in a scan is that machine's own dev server. Whoever can use the endpoint can make that machine open any address it can reach, so nothing but localhost is answered without a sign-in or a key, and `--host 0.0.0.0` without `--team` is refused.
 
 ### Tools
 
@@ -278,7 +263,7 @@ Results are kept small on purpose (ids and one-line summaries; detail on request
 
 ### What was checked, and what was not
 
-- A real MCP client drove the whole loop over stdio (starting the server with the exact command `connect` writes), over HTTP with a token, over the `/mcp` endpoint of `catchbunny serve`, and with a personal key against a team server. The token gate, the polling path and the installer are covered by `tests/test_connect.py`; the team server by `tests/test_team.py`.
+- A real MCP client drove the whole loop over stdio (starting the server with the exact command `connect` writes), over HTTP with a token, over the `/mcp` endpoint of `catchbunny start`, and with a personal key against a team server. The token gate, the polling path and the installer are covered by `tests/test_connect.py`; the team server by `tests/test_team.py`.
 - **The OAuth sign-in was driven by the MCP SDK's own OAuth client**: metadata discovery, dynamic registration, the consent page's API, the PKCE code exchange, an authenticated tool call, and a refresh that retires the pair it replaces. Declining is covered too.
 - **Codex itself ran a session against it.** The Codex binary that ships in the ChatGPT desktop app (0.148), pointed at `/mcp` with a one-off `-c mcp_servers.catchbunny.url=...`, called `scan` on the demo shop's product pages, then `get_finding`, and reported the four confirmed findings and the three-step reproduction. In `codex exec`, a tool that acts is cancelled unless approvals are routed somewhere: `--approve-for-me` does that.
 - **Claude Code itself ran a session against it.** Claude Code 2.1.321, given only the endpoint (`{"type": "http", "url": ".../mcp"}`) and allowed the Catchbunny tools, called `scan` on the demo shop's product pages, `run_status`, `get_finding` and `verify_fix`, and reported the four confirmed findings, the three-step reproduction and "still broken". The server's own log shows the eight MCP requests, and its database the run with exactly the parameters asked for. It ran headless (`claude -p --bare`) with an API key, on Claude Haiku 5.5.
@@ -287,7 +272,7 @@ Results are kept small on purpose (ids and one-line summaries; detail on request
 ## Serve it for a team
 
 ```bash
-catchbunny serve --team --host 0.0.0.0 --public-url https://qa.example.com
+catchbunny start --team --host 0.0.0.0 --public-url https://qa.example.com
 ```
 
 The same server, shared. `--public-url` is the address people and agents will type; put a reverse proxy with a certificate in front (with Caddy: `qa.example.com { reverse_proxy 127.0.0.1:8700 }`).
@@ -296,7 +281,7 @@ The same server, shared. `--public-url` is the address people and agents will ty
 - **Keys.** A person makes a key per place they use it (an agent, a CI job) on the Connect an agent page. It is shown once. It works as `Authorization: Bearer cb_...` on `/v1` and on `/mcp`.
 - **Connectors.** A client that cannot hold a key signs the person in with OAuth 2.1 (authorization code + PKCE, dynamic client registration), using the MCP SDK's authorization-server routes with Catchbunny as the provider (`oauth.py`). This needs HTTPS; on plain HTTP other than on the machine itself, the server offers keys only.
 - **What is kept.** Passwords are stretched with scrypt. Sessions, keys, the setup code's use and connector tokens are stored as hashes. The cookie is HttpOnly and SameSite (Secure on HTTPS); a state-changing request from another origin is refused even with it; eight wrong passwords for one address in five minutes make that address wait.
-- **On your own machine nothing changes**: no accounts. But `catchbunny serve` now answers only requests whose `Host` is localhost and sends no cross-origin headers, so a web page you happen to have open cannot drive it; and it refuses to listen on the network unless it is serving a team.
+- **On your own machine nothing changes**: no accounts. But `catchbunny start` answers only requests whose `Host` is localhost and sends no cross-origin headers, so a web page you happen to have open cannot drive it; and it refuses to listen on the network unless it is serving a team.
 
 One team per server, shared apps and runs, email and password only (no single sign-on, no password reset by email).
 
@@ -365,7 +350,7 @@ In practice: an 8B model adds a plan and coverage, and did not prove a semantic 
 
 ## Web console
 
-`web/` is a React + TypeScript single-page app, built with Vite and served by `catchbunny serve` itself (one port, no CORS): the landing page at `/`, the documentation at `/docs`, the console at `/app`. Each is its own chunk: the landing page loads about 120 kB of script (gzipped) and the docs about 100 kB, and neither loads the console's component library; before the split every page loaded 400 kB. In development, `npm run dev` proxies the API, including the event stream.
+`web/` is a React + TypeScript single-page app, built with Vite and served by `catchbunny start` itself (one port, no CORS): the landing page at `/`, the documentation at `/docs`, the console at `/app`. Each is its own chunk: the landing page loads about 120 kB of script (gzipped) and the docs about 100 kB, and neither loads the console's component library; before the split every page loaded 400 kB. In development, `npm run dev` proxies the API, including the event stream.
 
 - **Lanes.** One lane per tester, time running left to right. A block is one step, as wide as it took; a diamond above a block is a sighting, a step where a detector fired; the last lane shows each finding as a disc at the moment its fresh-browser replays finished, ticked if it replayed. Gaps are time spent waiting - on the page, or on a model. It is drawn on a canvas from the same SSE stream the API exposes, so a run in progress and a finished one are the same code path.
 - **Findings.** Severity as signal-strength bars (red only at or above the run's gate), one pip per replay, expected against actual, the steps, and the recording with a reel under it: steps, requests and console lines on one clock, a marker where the defect fired, click to seek.
@@ -376,7 +361,7 @@ In practice: an 8B model adds a plan and coverage, and did not prove a semantic 
 - **Team** (a team server only). The people, the team code and a new one on request. The ways in (set up, join, sign in, allow a connector) are pages of their own.
 - **Keyboard.** `n` starts a run, `g` then `a` / `c` / `r` / `s` / `m` jumps between apps, connecting an agent, runs, scenarios and the map, `j` and `k` walk the findings, `?` lists them all. Rows that can be clicked hold a real link or button, and the chosen finding and the chosen route are in the address.
 
-The site asks the server what it is (`/v1/meta`) before it offers a console. Served by `catchbunny serve`, the pages say "Open the console" (or "Sign in" on a team server). A copy of the site on a static host has no server behind it, so there the console is not offered at all and `/app` explains how to get one.
+The site asks the server what it is (`/v1/meta`) before it offers a console. Served by `catchbunny start`, the pages say "Open the console" (or "Sign in" on a team server). A copy of the site on a static host has no server behind it, so there the console is not offered at all and `/app` explains how to get one.
 
 ### Landing page
 
@@ -398,7 +383,7 @@ The page at `/` explains the product by showing it. It follows the skeleton the 
 
 Motion is there to explain: screens appear as they were discovered, pips fill as replays finish, steps are struck as they are removed. Each figure plays once when it is first seen, the run pauses when it is off screen, and everything stands still for a visitor who prefers reduced motion. The assets are in `web/public/demo/` (page screenshots and the replay video) and `web/src/landing/demo-run.json`; `web/scripts/export_demo.py --run <id>` regenerates all of them from any finished run of the demo shop.
 
-The demo shop itself (`catchbunny demo`, in `src/catchbunny/demo_shop.py`) is dressed as a real small store - illustrated products, a proper cart and checkout - because it is what people see in the tiles and the recording. The dressing is presentation only: every control, label, id and handler is unchanged, nothing loads from another origin, and no decoration is interactive. One thing did leak while restyling it: a placeholder on the newsletter field gave the field an accessible name and silently repaired a seeded bug. The test suite caught it, and the placeholder is gone.
+The demo shop itself (**Scan the demo shop** in the console, `src/catchbunny/demo_shop.py`) is dressed as a real small store - illustrated products, a proper cart and checkout - because it is what people see in the tiles and the recording. The dressing is presentation only: every control, label, id and handler is unchanged, nothing loads from another origin, and no decoration is interactive. One thing did leak while restyling it: a placeholder on the newsletter field gave the field an accessible name and silently repaired a seeded bug. The test suite caught it, and the placeholder is gone.
 
 ### Design
 
@@ -452,7 +437,7 @@ Where this goes further: verification is automatic rather than a button; reprodu
 
 ## HTTP API
 
-`catchbunny serve` → `http://127.0.0.1:8700` (interactive API reference at `/v1/docs`; `/docs` is the product's own documentation).
+`catchbunny start` → `http://127.0.0.1:8700` (interactive API reference at `/v1/docs`; `/docs` is the product's own documentation).
 
 | Method | Path | |
 |---|---|---|
@@ -497,7 +482,7 @@ Event types: `run.queued`, `run.phase`, `login`, `mission.started`, `step`, `mis
 ## Layout
 
 ```
-src/catchbunny/        domain, store, events, budget, config, vault, projects, api (API, request guard, the combined server), accounts (team, users, sessions, keys), oauth (connector sign-in), cli, mcp_server (stdio + HTTP), connect (agent registration), demo_shop (the shop `catchbunny demo` starts; the benchmark's target)
+src/catchbunny/        domain, store, events, budget, config, vault, projects, api (API, request guard, the combined server), accounts (team, users, sessions, keys), oauth (connector sign-in), cli, mcp_server (stdio + HTTP), connect (agent registration), demo_shop (the shop the console's demo scan starts; the benchmark's target)
   browser/           observe, locate, session, samples (files for upload controls)
   brain/             base, heuristic, llm (provider-neutral), claude, ollama
   engine/            productmap, tester, replay, triage, scenarios, relevance, orchestrator

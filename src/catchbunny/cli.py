@@ -1,19 +1,14 @@
-"""`catchbunny` command line: the same engine as the API, in-process.
+"""`catchbunny` command line. Three commands:
 
-    catchbunny try                                       # the whole thing at once, on a shop with bugs planted in it
-    catchbunny demo                                      # just that shop, to point other commands at
-    catchbunny scan     http://localhost:3000            # swarm bug hunt
-    catchbunny discover http://localhost:3000            # map the app, draft scenarios
-    catchbunny run      --url http://localhost:3000 scenarios/*.yaml
-    catchbunny export   fnd_abc123 --format scenario     # scenario | playwright | prompt
-    catchbunny serve                                     # the console, the API and MCP on this machine
-    catchbunny serve --team --public-url https://qa.example.com   # the same for a team, with sign-in
-    catchbunny connect  claude-code codex                # register the MCP server with those agents
-    catchbunny mcp                                       # MCP tools for a coding agent (stdio; the agent starts it)
-    catchbunny mcp --http --token auto                   # the same tools over HTTP, for connectors
-    catchbunny doctor                                    # can this machine run a scan?
+    catchbunny start                         # the console in your browser, the API and the MCP endpoint, on this machine
+    catchbunny scan http://localhost:3000    # scan an app from the terminal or CI, without the console
+    catchbunny connect                       # point Claude Code and Codex at the MCP endpoint `start` serves
 
-Exit code 0 = passed, 1 = failed (CI gate), 2 = blocked / error. With `--json`
+`start --team --public-url https://qa.example.com` serves the same for a team, with sign-in.
+Older commands (serve, mcp, doctor, discover, run, export, scenarios, demo) still work
+and are left out of the help.
+
+`scan` exits 0 = passed, 1 = failed (CI gate), 2 = blocked / error. With `--json`
 the last line of stdout is one machine-readable object for a coding agent.
 """
 
@@ -142,73 +137,6 @@ async def _ensure_browser(settings: Settings, engine: str) -> str:
     return problem
 
 
-def _free_port(preferred: int) -> int:
-    """`preferred` if nothing is listening there, else any free port."""
-    for port in (preferred, 0):
-        with socket.socket() as probe:
-            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # as the server will: a port just let go of is free
-            try:
-                probe.bind(("127.0.0.1", port))
-                return int(probe.getsockname()[1])
-            except OSError:
-                continue
-    raise OSError("no free port on 127.0.0.1")
-
-
-async def _try(settings: Settings, args: argparse.Namespace) -> int:
-    """Everything at once, for someone who has just installed it: the demo shop, a scan of it, and the
-    console showing that scan as it happens. One terminal, one command."""
-    import webbrowser
-
-    import uvicorn
-
-    from .api import Serving, serve_app
-    from .demo_shop import BUGS, PASSWORD, USER, create_shop, parse_bugs
-
-    if problem := await _ensure_browser(settings, "chromium"):
-        _say(f"The browser cannot start: {problem}\nCheck with: catchbunny doctor")
-        return 2
-    import logging
-
-    logging.getLogger("mcp").setLevel(logging.WARNING)  # the MCP transport's start-up chatter is not for this terminal
-    shop_url, console_url = (f"http://127.0.0.1:{_free_port(p)}" for p in (8811, 8700))
-    core = App(settings)
-    shop = uvicorn.Server(uvicorn.Config(create_shop(parse_bugs("all")), host="127.0.0.1", port=int(shop_url.rsplit(":", 1)[1]), log_level="warning"))
-    console = uvicorn.Server(uvicorn.Config(serve_app(core, Serving(local_only=True, public_url=console_url)), host="127.0.0.1", port=int(console_url.rsplit(":", 1)[1]), log_level="warning"))
-    servers = [asyncio.create_task(shop.serve()), asyncio.create_task(console.serve())]
-
-    async def stop() -> None:
-        shop.should_exit = console.should_exit = True
-        await asyncio.gather(*servers, return_exceptions=True)
-
-    while not (shop.started and console.started):
-        if any(task.done() for task in servers):
-            await stop()
-            _say("Could not start the demo shop or the console. Check that ports are free, then try again.")
-            return 2
-        await asyncio.sleep(0.05)
-
-    _say(f"{f'Mug & Co, a shop with {len(BUGS)} bugs planted in it':<47}{shop_url}")
-    _say(f"{'The console, where you can watch the testers':<47}{console_url}/app")
-    project = await ensure_project(core, shop_url, user=USER, password=PASSWORD)
-    spec = RunSpec(kind=RunKind.DEEP_SCAN, brain=args.brain, testers=6, devices=["desktop", "iphone"], max_steps=500, max_minutes=5)
-    run = await core.runs.start(project, spec)
-    watch = f"{console_url}/app/runs/{run.id}"
-    _say(f"\nScanning it now: six testers, signed out and signed in, on a desktop and a phone. Watch it live at\n  {watch}\n")
-    if not args.no_open:
-        webbrowser.open(watch)
-    await _follow(core, run, quiet=False)
-    code = await _report(core, await core.runs.wait(run.id), as_json=False)
-    _say(f"\nEvery finding above was replayed in a fresh browser before it was reported. Open one to see the recording:\n  {watch}")
-    _say("\nYour own app is next, while it is running:\n  catchbunny scan http://localhost:3000")
-    if args.exit:
-        await stop()
-        return code
-    _say("\nThe console stays open until you press Ctrl+C.")
-    await asyncio.gather(*servers, return_exceptions=True)
-    return code
-
-
 async def _demo(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -279,8 +207,30 @@ async def _serve_mcp_http(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
-async def _serve(settings: Settings, args: argparse.Namespace) -> int:
+def _can_open_browser() -> bool:
+    """Whether opening a page will put it in front of the person who typed the command: not in a script,
+    and not on a machine with no screen, where Linux may hand the page to a text browser in this terminal."""
+    if not sys.stderr.isatty():
+        return False
+    return sys.platform in ("darwin", "win32") or bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
+def _catchbunny_at(base: str) -> bool:
+    """Whether a Catchbunny server answers at `base`."""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"{base}/v1/meta", timeout=2) as reply:
+            return json.loads(reply.read()).get("product") == "catchbunny"
+    except (OSError, ValueError):
+        return False
+
+
+async def _start(settings: Settings, args: argparse.Namespace, open_browser: bool) -> int:
     """The site, the console, the API and the MCP endpoint on one port: for this machine, or for a team."""
+    import logging
+    import webbrowser
+
     import uvicorn
 
     from .accounts import Accounts
@@ -289,11 +239,12 @@ async def _serve(settings: Settings, args: argparse.Namespace) -> int:
     team = args.team or os.environ.get("CATCHBUNNY_TEAM", "") == "1"
     local = f"http://{'127.0.0.1' if args.host in ('0.0.0.0', '::') else args.host}:{args.port}"
     public = (args.public_url or os.environ.get("CATCHBUNNY_PUBLIC_URL", "") or local).rstrip("/")
+    open_browser = open_browser and not team and _can_open_browser()
     if not team and args.host not in LOOPBACK:
         _say(
             f"Refusing to serve {args.host} without accounts: whoever reaches this server can make this machine open any address it can reach.\n"
             "Serve it for a team instead, so people sign in:\n"
-            f"  catchbunny serve --team --host {args.host} --public-url https://your.domain"
+            f"  catchbunny start --team --host {args.host} --public-url https://your.domain"
         )
         return 2
     try:  # say it plainly now, rather than let the server start, fail to bind and stop again
@@ -301,10 +252,16 @@ async def _serve(settings: Settings, args: argparse.Namespace) -> int:
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind((args.host, args.port))
     except OSError:
-        _say(f"Port {args.port} is already in use. Another Catchbunny may be running there: stop it, or choose another port with --port.")
+        if not team and _catchbunny_at(local):
+            _say(f"Catchbunny is already running at {local}/app")
+            if open_browser:
+                webbrowser.open(f"{local}/app")
+            return 0
+        _say(f"Port {args.port} is in use by another program. Start Catchbunny on another one: catchbunny start --port {args.port + 1}")
         return 2
     if problem := await _ensure_browser(settings, settings.browser):
-        _say(f"Warning: the {settings.browser} browser cannot start ({problem}). The console will open, but runs will not. Check with: catchbunny doctor")
+        _say(f"Warning: the {settings.browser} browser cannot start ({problem}). The console will open, but scans will not. Check with: catchbunny doctor")
+    logging.getLogger("mcp").setLevel(logging.WARNING)  # the MCP transport's start-up chatter is not for this terminal
     serving = Serving(team=team, public_url=public, local_only=not team)
     core = App(settings)
     if not WEB_DIST.is_dir():
@@ -328,12 +285,23 @@ async def _serve(settings: Settings, args: argparse.Namespace) -> int:
             _say("  First time here. Create the owner account:")
             _say(f"    {public}/app/setup?code={code}")
     else:
-        _say(f"Catchbunny                 {local}")
-        _say(f"  console                  {local}/app")
-        _say(f"  MCP endpoint for agents  {local}/mcp   (this machine only)")
-        _say("  To share it with a team: catchbunny serve --team")
-    config = uvicorn.Config(serve_app(core, serving), host=args.host, port=args.port, log_level="info", proxy_headers=True, forwarded_allow_ips=args.trust_proxy)
-    await uvicorn.Server(config).serve()
+        _say(f"Catchbunny is running      {local}/app")
+        _say(f"  MCP endpoint for agents  {local}/mcp   (connect them with: catchbunny connect)")
+        _say("  Leave this terminal open. Ctrl+C stops it.")
+    config = uvicorn.Config(serve_app(core, serving), host=args.host, port=args.port, log_level="warning", proxy_headers=True, forwarded_allow_ips=args.trust_proxy)
+    server = uvicorn.Server(config)
+
+    async def show() -> None:
+        while not server.started:
+            if server.should_exit:
+                return
+            await asyncio.sleep(0.05)
+        webbrowser.open(f"{local}/app")
+
+    opener = asyncio.create_task(show()) if open_browser else None
+    await server.serve()
+    if opener:
+        opener.cancel()
     return 0
 
 
@@ -346,16 +314,19 @@ async def _main(args: argparse.Namespace) -> int:
     if args.command == "connect":
         from .connect import connect
 
-        code = connect(args.clients, scope=args.scope, remove=args.remove, dry=args.print, say=_say)
-        if args.clients and not args.remove and not args.print and not args.no_browser and await _browser_starts(settings):
-            code = await _doctor(settings, install=True) or code
+        url = None if args.stdio else args.url
+        code = connect(args.clients, url=url, scope=args.scope, remove=args.remove, dry=args.print, say=_say)
+        if code == 0 and not args.remove and not args.print:
+            if url is None:  # the agent will start Catchbunny itself, so the browser must be here for it
+                if not args.no_browser and await _browser_starts(settings):
+                    code = await _doctor(settings, install=True) or code
+            elif not _catchbunny_at(url.removesuffix("/mcp")):
+                _say("\nCatchbunny is not running yet. Start it, and leave it running while the agent works:\n  catchbunny start")
         return code
-    if args.command == "serve":
-        return await _serve(settings, args)
+    if args.command in ("start", "serve"):
+        return await _start(settings, args, open_browser=args.command == "start" and not args.no_open)
     if args.command == "demo":
         return await _demo(args)
-    if args.command == "try":
-        return await _try(settings, args)
     if args.command in ("scan", "discover", "run") and (problem := await _ensure_browser(settings, args.browser)):
         _say(f"The {args.browser} browser cannot start: {problem}\nCheck with: catchbunny doctor --browser {args.browser}")
         return 2
@@ -423,84 +394,98 @@ async def _main(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(prog="catchbunny", description="Autonomous QA swarm for web apps.")
-    p.add_argument("--data-dir", default="", help="where runs, findings and recordings are kept (default ~/.catchbunny)")
-    sub = p.add_subparsers(dest="command", required=True)
+    p = argparse.ArgumentParser(
+        prog="catchbunny",
+        usage="catchbunny <command> [options]",
+        description="Browser testers that prove a bug before they report it.",
+        epilog="Start here:  catchbunny start\nEach command:  catchbunny <command> --help",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    hidden = argparse.SUPPRESS
+    p.add_argument("--data-dir", default="", help=hidden)  # where runs, findings and recordings are kept (default ~/.catchbunny)
+    sub = p.add_subparsers(dest="command", title="commands", metavar="<command>", prog="catchbunny")
+
+    def server(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--port", type=int, default=8700, help="the port to serve on (default 8700)")
+        sp.add_argument("--team", action="store_true", help="serve it for a team: people sign in, and join with the team's code (or set CATCHBUNNY_TEAM=1)")
+        sp.add_argument("--public-url", default="", help="with --team: the address people and agents reach it at, e.g. https://qa.example.com")
+        sp.add_argument("--host", default="127.0.0.1", help="the address to listen on; anything but localhost needs --team")
+        sp.add_argument("--trust-proxy", default="127.0.0.1", help="addresses of the reverse proxy whose forwarded headers are believed (default 127.0.0.1)")
 
     def target(sp: argparse.ArgumentParser) -> None:
-        sp.add_argument("--policy", default="safe_writes", choices=[x.value for x in Policy])
-        sp.add_argument("--user", default="", help="test account username (enables a signed-in persona)")
+        sp.add_argument("--user", default="", help="a test account, to test signed in as well")
         sp.add_argument("--password", default="")
-        sp.add_argument("--login-path", default="/login")
-        sp.add_argument("--testers", type=int, default=4, help="parallel browser contexts")
-        sp.add_argument("--minutes", type=float, default=5.0)
-        sp.add_argument("--brain", default="auto", choices=["auto", "heuristic", "claude", "ollama"], help="auto: Claude when a key is present, else no model")
-        sp.add_argument("--model", default="", help="model override, e.g. an Ollama tag with --brain ollama")
+        sp.add_argument("--login-path", default="/login", help="where the sign-in page is (default /login)")
+        sp.add_argument("--policy", default="safe_writes", choices=[x.value for x in Policy], help="read_only: never change anything (default safe_writes)")
+        sp.add_argument("--testers", type=int, default=4, help="browsers working at once (default 4)")
+        sp.add_argument("--minutes", type=float, default=5.0, help="time limit (default 5)")
         sp.add_argument("--browser", default=Settings().browser, choices=BROWSERS, help="the engine to test in; webkit is the engine Safari is built on")
+        sp.add_argument("--brain", default="auto", choices=["auto", "heuristic", "claude", "ollama"], help="auto: Claude when ANTHROPIC_API_KEY is set, else no model")
+        sp.add_argument("--model", default="", help=hidden)
         sp.add_argument("--reset-path", default="", help="a path on the app that puts its test data back; called before every replay")
-        sp.add_argument("--json", action="store_true", help="agent mode: one JSON object on stdout")
+        sp.add_argument("--json", action="store_true", help="one JSON object on stdout, for a coding agent")
 
-    for name, text in (("scan", "hunt for bugs with a swarm of testers"), ("discover", "map the app and draft regression scenarios")):
-        sp = sub.add_parser(name, help=text)
-        sp.add_argument("url")
-        sp.add_argument("--goal", default="", help="what the testers should investigate")
-        sp.add_argument("--area", action="append", default=[], help="path prefix to stay within (repeatable)")
-        sp.add_argument("--devices", default="desktop", help="comma list: desktop,laptop,tablet,iphone,android")
-        sp.add_argument("--steps", type=int, default=400, help="shared step budget")
-        sp.add_argument("--usd", type=float, default=2.0, help="model spend cap")
-        sp.add_argument("--verify-runs", type=int, default=2)
-        sp.add_argument("--no-minimize", action="store_true")
-        sp.add_argument("--no-record", action="store_true", help="skip video/trace capture for confirmed findings")
-        sp.add_argument("--screenshots", default="on_signal", choices=["on_signal", "every_step", "off"])
-        sp.add_argument("--knowledge", default="", help="product notes for the testers")
+    def hunt(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("url", help="the address of a running app, e.g. http://localhost:3000")
+        sp.add_argument("--devices", default="desktop", help="any of desktop,laptop,tablet,iphone,android (default desktop)")
+        sp.add_argument("--area", action="append", default=[], help="a path prefix to stay within (repeatable)")
+        sp.add_argument("--goal", default="", help="what model-driven testers should look into")
+        sp.add_argument("--steps", type=int, default=400, help=hidden)
+        sp.add_argument("--usd", type=float, default=2.0, help=hidden)
+        sp.add_argument("--verify-runs", type=int, default=2, help=hidden)
+        sp.add_argument("--no-minimize", action="store_true", help=hidden)
+        sp.add_argument("--no-record", action="store_true", help=hidden)
+        sp.add_argument("--screenshots", default="on_signal", choices=["on_signal", "every_step", "off"], help=hidden)
+        sp.add_argument("--knowledge", default="", help=hidden)
         target(sp)
 
-    sp = sub.add_parser("try", help="see it work: start a shop with bugs planted in it, scan it, and open the console on that scan")
-    sp.add_argument("--brain", default="heuristic", choices=["heuristic", "claude", "ollama"], help="who drives the testers (default: no model, so nothing is billed)")
+    # The three commands. Only these have help, so only these are listed.
+    sp = sub.add_parser("start", help="open the console in your browser, and serve MCP for agents", description="Serve the console, the API and the MCP endpoint at http://127.0.0.1:8700, and open the console.")
+    server(sp)
     sp.add_argument("--no-open", action="store_true", help="do not open the browser")
-    sp.add_argument("--exit", action="store_true", help="stop when the scan is done, instead of keeping the console open")
 
-    sp = sub.add_parser("demo", help="start the demo shop, a small store with bugs planted in it, to try Catchbunny on")
-    sp.add_argument("--port", type=int, default=8811)
-    sp.add_argument("--bugs", default="all", help="all, none, or a comma list of the planted bugs")
+    sp = sub.add_parser("scan", help="scan a running app from the terminal or CI", description="Hunt for bugs in a running app and report the ones that replayed in a fresh browser. Exit code 0 passed, 1 failed, 2 could not test.")
+    hunt(sp)
 
-    sp = sub.add_parser("run", help="run scenario files")
+    sp = sub.add_parser("connect", help="connect Claude Code and Codex over MCP", description="Point coding agents at the MCP endpoint that `catchbunny start` serves. With no names, every agent found on this machine.")
+    sp.add_argument("clients", nargs="*", choices=["claude-code", "codex", "claude-desktop"], metavar="agent", help="claude-code, codex, claude-desktop (default: the ones found here)")
+    sp.add_argument("--url", default="http://127.0.0.1:8700/mcp", help="the MCP endpoint (default http://127.0.0.1:8700/mcp)")
+    sp.add_argument("--stdio", action="store_true", help="let the agent start Catchbunny itself instead, with no server running")
+    sp.add_argument("--remove", action="store_true", help="take it out again")
+    sp.add_argument("--print", action="store_true", help="show what would be written and change nothing")
+    sp.add_argument("--scope", default="", choices=["", "project", "user"], help=hidden)
+    sp.add_argument("--no-browser", action="store_true", help=hidden)
+
+    # Earlier commands, kept working for scripts and agents that use them, and left out of the help.
+    sp = sub.add_parser("serve")
+    server(sp)
+    sp = sub.add_parser("discover")
+    hunt(sp)
+    sp = sub.add_parser("run")
     sp.add_argument("files", nargs="+")
     sp.add_argument("--url", required=True)
     target(sp)
-
-    sp = sub.add_parser("export", help="export a finding")
+    sp = sub.add_parser("export")
     sp.add_argument("finding_id")
     sp.add_argument("--format", default="scenario", choices=["scenario", "playwright", "prompt"])
     sp.add_argument("-o", "--output", default="")
-
-    sub.add_parser("scenarios", help="list saved scenarios")
-
-    sp = sub.add_parser("mcp", help="serve Catchbunny as MCP tools for a coding agent (stdio, or --http)")
-    sp.add_argument("--http", action="store_true", help="serve Streamable HTTP at /mcp instead of stdio")
+    sub.add_parser("scenarios")
+    sp = sub.add_parser("mcp")
+    sp.add_argument("--http", action="store_true")
     sp.add_argument("--host", default="127.0.0.1")
     sp.add_argument("--port", type=int, default=8710)
-    sp.add_argument("--token", default="", help="access token for --http; `auto` makes one and keeps it in the data directory (or set CATCHBUNNY_MCP_TOKEN)")
-
-    sp = sub.add_parser("connect", help="register the MCP server with coding agents on this machine")
-    sp.add_argument("clients", nargs="*", choices=["claude-code", "codex", "claude-desktop"], metavar="client", help="claude-code, codex, claude-desktop")
-    sp.add_argument("--scope", default="", choices=["", "project", "user"], help="claude-code defaults to project (./.mcp.json); codex to user (~/.codex/config.toml)")
-    sp.add_argument("--remove", action="store_true", help="take the registration out again")
-    sp.add_argument("--print", action="store_true", help="show what would be written and change nothing")
-    sp.add_argument("--no-browser", action="store_true", help="do not install the browser if it is missing")
-
-    sp = sub.add_parser("doctor", help="check that this machine can run a scan")
-    sp.add_argument("--browser", default="chromium", choices=[*BROWSERS, "all"], help="which engine to check (default chromium; `all` checks the three)")
-    sp.add_argument("--install-browser", action="store_true", help="install the engine for Playwright if it is missing")
-
-    sp = sub.add_parser("serve", help="the console, the API and the MCP endpoint on one port")
-    sp.add_argument("--host", default="127.0.0.1", help="the address to listen on; anything but localhost needs --team")
-    sp.add_argument("--port", type=int, default=8700)
-    sp.add_argument("--team", action="store_true", help="serve it for a team: people sign in, and join with the team's code (or set CATCHBUNNY_TEAM=1)")
-    sp.add_argument("--public-url", default="", help="the address people and agents reach it at, e.g. https://qa.example.com (or set CATCHBUNNY_PUBLIC_URL)")
-    sp.add_argument("--trust-proxy", default="127.0.0.1", help="addresses of the reverse proxy whose forwarded headers are believed (default 127.0.0.1)")
+    sp.add_argument("--token", default="")
+    sp = sub.add_parser("doctor")
+    sp.add_argument("--browser", default="chromium", choices=[*BROWSERS, "all"])
+    sp.add_argument("--install-browser", action="store_true")
+    sp = sub.add_parser("demo")
+    sp.add_argument("--port", type=int, default=8811)
+    sp.add_argument("--bugs", default="all")
 
     args = p.parse_args(argv)
+    if args.command is None:
+        p.print_help()
+        sys.exit(0)
     try:
         sys.exit(asyncio.run(_main(args)))
     except KeyboardInterrupt:

@@ -1,7 +1,7 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Skeleton } from "antd";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { ProjectForm } from "../components/ProjectForm";
 import { Note, Stamp } from "../components/marks";
@@ -9,6 +9,15 @@ import { ago, KIND_LABEL, plural, verdictLine } from "../format";
 
 export function ProjectsPage() {
   const [adding, setAdding] = useState(false);
+  const navigate = useNavigate();
+  const client = useQueryClient();
+  const demo = useMutation({
+    mutationFn: api.scanDemo,
+    onSuccess: ({ run_id }) => {
+      client.invalidateQueries({ queryKey: ["projects"] });  // the demo shop is an app now
+      navigate(`/app/runs/${run_id}`);
+    },
+  });
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -30,12 +39,17 @@ export function ProjectsPage() {
 
       {projects.isError && <Note type="error" title={<>{(projects.error as Error).message} <button className="link" onClick={() => projects.refetch()}>Try again</button></>} />}
       {projects.isLoading && <div className="sheet sheet-body"><Skeleton active paragraph={{ rows: 3 }} /></div>}
-      {slow && <Note type="warning" style={{ marginTop: 12 }} title={<>This is taking longer than it should. Check that <code>catchbunny serve</code> is still running.</>} />}
+      {slow && <Note type="warning" style={{ marginTop: 12 }} title={<>This is taking longer than it should. Check that <code>catchbunny start</code> is still running.</>} />}
       {projects.data?.length === 0 && (
         <div className="sheet blank">
           <h2>Nothing to test yet</h2>
           <p>Add the address of an app that is running, locally or on a staging server. Catchbunny needs nothing installed in it.</p>
-          <Button type="primary" onClick={() => setAdding(true)}>Add an app</Button>
+          <div className="blank-actions">
+            <Button type="primary" onClick={() => setAdding(true)}>Add an app</Button>
+            <Button onClick={() => demo.mutate()} loading={demo.isPending}>Scan the demo shop</Button>
+          </div>
+          <p className="faint">No app running yet? The demo shop is a small store with bugs planted in it. It starts beside Catchbunny, and six testers scan it while you watch.</p>
+          {demo.error && <Note type="error" title={demo.error.message} style={{ maxWidth: 520, margin: "0 auto" }} />}
         </div>
       )}
       {!!projects.data?.length && (
