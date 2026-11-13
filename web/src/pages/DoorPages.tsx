@@ -141,7 +141,7 @@ export function NoServerPage() {
           <h1 className="display">The console runs where Catchbunny runs</h1>
           <p>This is a copy of the site with no Catchbunny server behind it. Install it, start it, and the console opens on your own machine, with your own runs in it.</p>
           <div className="no-server">
-            <Code label="Install and start" text={"uv sync && uv run playwright install chromium --only-shell\n(cd web && npm install && npm run build)\nuv run catchbunny serve"} />
+            <Code label="Install and start" text={"uv tool install git+https://github.com/cpldxx/catchbunny\ncatchbunny serve"} />
           </div>
           <p>Then open <code translate="no">http://127.0.0.1:8700/app</code>.</p>
           <div className="actions">

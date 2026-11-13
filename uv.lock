@@ -77,6 +77,7 @@ dependencies = [
     { name = "mcp" },
     { name = "playwright" },
     { name = "pydantic" },
+    { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "uvicorn" },
 ]
@@ -85,18 +86,18 @@ dependencies = [
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "python-multipart" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=1.0" },
+    { name = "anthropic", specifier = ">=2.8" },
     { name = "cryptography", specifier = ">=43" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
-    { name = "mcp", specifier = ">=1.2" },
-    { name = "playwright", specifier = ">=1.49" },
+    { name = "mcp", specifier = ">=2.3" },
+    { name = "playwright", specifier = ">=1.65" },
     { name = "pydantic", specifier = ">=2.9" },
+    { name = "python-multipart", specifier = ">=0.0.33" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
@@ -105,7 +106,6 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "python-multipart", specifier = ">=0.0.33" },
 ]
 
 [[package]]
