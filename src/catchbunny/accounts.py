@@ -12,6 +12,10 @@ it needs to know who is asking, so this module keeps:
 Nothing here is clever, on purpose. Passwords are stretched with scrypt and
 never stored. Every secret the server hands out (a session, a token, the setup
 code) is kept only as a hash, so reading the database does not let you in.
+
+Stretching is the one expensive thing a stranger can ask for, so it is kept
+off the event loop, a few at a time, and only after the guessing limits have
+been checked: for an email address, and for the address the request came from.
 """
 
 from __future__ import annotations
@@ -23,8 +27,9 @@ import hmac
 import re
 import secrets
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -37,6 +42,13 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O or 1/I: a code is read out loud and typed by hand
 _SCRYPT = {"n": 2**15, "r": 8, "p": 1}
 TOKEN_PREFIX = "cb_"  # so a leaked key is recognisable in a log or a diff
+STRETCHING_AT_ONCE = 4  # scrypt holds 32 MB and a core for about 60 ms; a flood of sign-ins queues for these
+# What a password is checked against when there is no such account, so that answer costs what a real one
+# does and does not tell a stranger which emails have accounts. Random: no password matches it.
+_NOBODY = "scrypt${n}${r}${p}${salt}${key}".format(**_SCRYPT, salt=base64.b64encode(secrets.token_bytes(16)).decode(), key=base64.b64encode(secrets.token_bytes(32)).decode())
+
+
+T = TypeVar("T")
 
 
 class AccountError(Exception):
@@ -107,9 +119,14 @@ def check_password(password: str, stored: str) -> bool:
 
 
 class Accounts:
+    WINDOW = 300.0  # seconds a wrong guess is remembered
+    PER_EMAIL = 8  # wrong guesses at one account in that time
+    PER_CLIENT = 30  # wrong guesses from one address, at any accounts: an office shares one address
+
     def __init__(self, store: Store, data_dir: Path) -> None:
         self.store, self.data_dir = store, Path(data_dir)
         self._failures: dict[str, list[float]] = {}  # who has been guessing, and when
+        self._stretching = asyncio.Semaphore(STRETCHING_AT_ONCE)
 
     # ------------------------------------------------------------------ the team
 
@@ -169,36 +186,40 @@ class Accounts:
             raise AccountError(f"Choose a password of at least {MIN_PASSWORD} characters.")
         if any(u.email == email for u in await self.users()):
             raise AccountError("There is already an account with that email. Sign in instead.", 409)
-        user = User(email=email, name=name[:80], role=role, password=await asyncio.to_thread(hash_password, password))
+        user = User(email=email, name=name[:80], role=role, password=await self._stretch(hash_password, password))
         await self.store.put_now("user", user.id, user, created=user.created_at)
         return user
 
-    async def create_owner(self, code: str, *, email: str, name: str, password: str) -> User:
+    async def create_owner(self, code: str, *, email: str, name: str, password: str, client: str = "") -> User:
         if not await self.needs_owner():
             raise AccountError("This server already has an owner. Ask them for the team code and join with it.", 409)
+        guessers = self._guessers(client=client)
+        self._slow_down(guessers)
         if not _same(code, self.setup_code()):
+            self._failed(guessers)
             raise AccountError("That is not the setup code. It is printed in the terminal where the server was started.", 403)
         user = await self._create(email=email, name=name, password=password, role="owner")
         (self.data_dir / "setup_code").unlink(missing_ok=True)
         return user
 
-    async def join(self, code: str, *, email: str, name: str, password: str) -> User:
+    async def join(self, code: str, *, email: str, name: str, password: str, client: str = "") -> User:
         if await self.needs_owner():
             raise AccountError("This server has not been set up yet. Whoever started it sets it up first.", 409)
-        self._slow_down(f"join:{email}")
+        guessers = self._guessers(f"join:{email.strip().lower()}", client)
+        self._slow_down(guessers)
         if not _same(code, (await self.team()).code):
-            self._failed(f"join:{email}")
+            self._failed(guessers)
             raise AccountError("That is not this team's code. Ask the owner for the current one.", 403)
         return await self._create(email=email, name=name, password=password, role="member")
 
-    async def sign_in(self, email: str, password: str) -> User:
+    async def sign_in(self, email: str, password: str, *, client: str = "") -> User:
         email = email.strip().lower()
-        self._slow_down(f"sign-in:{email}")
+        guessers = self._guessers(f"sign-in:{email}", client)
         user = next((u for u in await self.users() if u.email == email), None)
-        # Checked even when there is no such account, so the answer takes as long either way.
-        ok = await asyncio.to_thread(check_password, password, user.password if user else hash_password(""))
+        # Checked even when there is no such account, against a stand-in, so the answer takes as long either way.
+        ok = await self._stretch(check_password, password, user.password if user else _NOBODY, before=lambda: self._slow_down(guessers))
         if user is None or not ok:
-            self._failed(f"sign-in:{email}")
+            self._failed(guessers)
             raise AccountError("The email or the password is wrong.", 401)
         return user
 
@@ -214,14 +235,31 @@ class Accounts:
                 await self.store.delete(kind, doc["key"])
         await self.store.delete("user", user_id)
 
-    def _slow_down(self, who: str, limit: int = 8, window: float = 300.0) -> None:
-        recent = [t for t in self._failures.get(who, []) if time.monotonic() - t < window]
-        self._failures[who] = recent
-        if len(recent) >= limit:
-            raise AccountError("Too many attempts. Wait a few minutes and try again.", 429)
+    async def _stretch(self, work: Callable[..., T], *args: Any, before: Callable[[], None] | None = None) -> T:
+        """Run scrypt in a thread, a few at a time. `before` runs once a turn has come: a burst sent at
+        once waits here, and is refused here once the guessing limit is reached, without stretching."""
+        async with self._stretching:
+            if before:
+                before()
+            return await asyncio.to_thread(work, *args)
 
-    def _failed(self, who: str) -> None:
-        self._failures.setdefault(who, []).append(time.monotonic())
+    def _guessers(self, account: str = "", client: str = "") -> list[tuple[str, int]]:
+        """Who a wrong guess counts against: the account guessed at, and where the guess came from."""
+        return [(key, limit) for key, limit in ((account, self.PER_EMAIL), (client and f"from:{client}", self.PER_CLIENT)) if key]
+
+    def _slow_down(self, guessers: list[tuple[str, int]]) -> None:
+        for who, limit in guessers:
+            recent = [t for t in self._failures.get(who, []) if time.monotonic() - t < self.WINDOW]
+            self._failures[who] = recent
+            if len(recent) >= limit:
+                raise AccountError("Too many attempts. Wait a few minutes and try again.", 429)
+
+    def _failed(self, guessers: list[tuple[str, int]]) -> None:
+        at = time.monotonic()
+        for who, _ in guessers:
+            self._failures.setdefault(who, []).append(at)
+        if len(self._failures) > 10_000:  # a guess at a new address each time must not grow this for ever
+            self._failures = {who: ts for who, ts in self._failures.items() if ts and at - ts[-1] < self.WINDOW}
 
     # ------------------------------------------------------------------ sessions (a browser)
 

@@ -1,0 +1,14 @@
+# Response headers for a copy of the site on Cloudflare Pages (catchbunny.pages.dev).
+# Only that host reads this file; `catchbunny start` serves the same pages with its own headers.
+#
+# The site loads nothing from another origin: scripts, styles, fonts, images and the demo
+# video all come from here, and the one request it makes (/v1/meta) is to here too.
+# Styles allow 'unsafe-inline' because Ant Design writes its styles into <style> elements.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Cross-Origin-Opener-Policy: same-origin

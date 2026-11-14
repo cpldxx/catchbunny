@@ -10,4 +10,5 @@
 - Scenario relevance is lexical. Multi-actor scenarios and scheduled monitors are not built.
 - The MCP endpoint has been driven by the MCP SDK's client (including its OAuth client), by Codex and by Claude Code, not yet by the connectors inside Claude and ChatGPT. An installed copy carries the built console with it.
 - A team server has one team and is one process. Sign-in is email and password: no single sign-on, no password reset by email.
+- The guard that keeps a team server's browsers off a cloud metadata service sees only the first address of a redirect chain, and judges a host name by its own lookup. A redirect, or a name whose DNS answer changes in between, gets past it; the cloud's own setting (IMDSv2 on AWS) closes that. Guessing limits are kept in memory, so a restart clears them.
 - The console's pages are checked in a real browser for loading and for the ways in (`tests/test_console.py`); their finer behaviour was checked by hand at desktop and phone widths.

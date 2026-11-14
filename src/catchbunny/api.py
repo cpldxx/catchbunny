@@ -192,6 +192,12 @@ class Guard:
         await self.app(scope, receive, send)
 
 
+def _client(request: Request) -> str:
+    """The address a request came from. Behind a proxy that `--trust-proxy` names, uvicorn has already
+    put the address the proxy saw here; from anyone else, a forwarded header is not believed."""
+    return request.client.host if request.client else ""
+
+
 def create_app(core: App | None = None, *, manage: bool = False, serving: Serving | None = None) -> FastAPI:
     owned = core is None or manage  # who starts and stops the engine
     app_core = core or App()
@@ -291,24 +297,24 @@ def create_app(core: App | None = None, *, manage: bool = False, serving: Servin
     # ------------------------------------------------------------------ accounts (a team server)
 
     @api.post("/v1/auth/setup", status_code=201)
-    async def setup(body: OwnerIn, response: Response) -> dict[str, Any]:
+    async def setup(body: OwnerIn, request: Request, response: Response) -> dict[str, Any]:
         """Create the owner. Needs the setup code printed where the server was started."""
         if not serving.team:
             raise HTTPException(404, "This server has no accounts: it is not being served for a team.")
-        return await welcome(response, await accounts.create_owner(body.code, email=body.email, name=body.name, password=body.password))
+        return await welcome(response, await accounts.create_owner(body.code, email=body.email, name=body.name, password=body.password, client=_client(request)))
 
     @api.post("/v1/auth/join", status_code=201)
-    async def join(body: OwnerIn, response: Response) -> dict[str, Any]:
+    async def join(body: OwnerIn, request: Request, response: Response) -> dict[str, Any]:
         """Create a member account. Needs the team's code, which the owner hands out."""
         if not serving.team:
             raise HTTPException(404, "This server has no accounts: it is not being served for a team.")
-        return await welcome(response, await accounts.join(body.code, email=body.email, name=body.name, password=body.password))
+        return await welcome(response, await accounts.join(body.code, email=body.email, name=body.name, password=body.password, client=_client(request)))
 
     @api.post("/v1/auth/sign-in")
-    async def sign_in(body: SignInIn, response: Response) -> dict[str, Any]:
+    async def sign_in(body: SignInIn, request: Request, response: Response) -> dict[str, Any]:
         if not serving.team:
             raise HTTPException(404, "This server has no accounts: it is not being served for a team.")
-        return await welcome(response, await accounts.sign_in(body.email, body.password))
+        return await welcome(response, await accounts.sign_in(body.email, body.password, client=_client(request)))
 
     @api.post("/v1/auth/sign-out", status_code=204)
     async def sign_out(request: Request, response: Response) -> None:

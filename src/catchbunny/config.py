@@ -30,6 +30,9 @@ class Settings:
     # ---- browser fleet
     browser: str = field(default_factory=lambda: _env("BROWSER", "chromium"))  # the engine a run uses unless it names one: chromium | firefox | webkit
     headless: bool = field(default_factory=lambda: _env("HEADLESS", "1") != "0")
+    # Check every request a tester's browser makes against browser/netguard.py, so no redirect or link
+    # reaches a cloud metadata service. On for a team server; it turns off the browser's HTTP cache.
+    guard_network: bool = field(default_factory=lambda: _env("GUARD_NETWORK", "0") == "1")
     max_contexts: int = field(default_factory=lambda: int(_env("MAX_CONTEXTS", "12")))
     # Contexts share one browser process (cheap) but also its browser-process
     # main thread, so the pool spreads load over several processes past this.
