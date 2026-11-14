@@ -1,5 +1,5 @@
 // The documentation, as data. Every command and number here is one the product
-// accepts or produced; README.md is the longer account of the same things.
+// accepts or produced; docs/ at the project root is the longer account of the same things.
 
 import type { ReactNode } from "react";
 
