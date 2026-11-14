@@ -237,6 +237,7 @@ async def _start(settings: Settings, args: argparse.Namespace, open_browser: boo
     from .api import WEB_DIST, Serving, serve_app
 
     team = args.team or os.environ.get("CATCHBUNNY_TEAM", "") == "1"
+    settings.guard_network = settings.guard_network or team  # people other than this machine's owner start scans: see browser/netguard.py
     local = f"http://{'127.0.0.1' if args.host in ('0.0.0.0', '::') else args.host}:{args.port}"
     public = (args.public_url or os.environ.get("CATCHBUNNY_PUBLIC_URL", "") or local).rstrip("/")
     open_browser = open_browser and not team and _can_open_browser()

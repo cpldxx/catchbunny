@@ -38,7 +38,7 @@ With `--stdio`, the agent starts a Catchbunny of its own over stdio instead, so 
 
 Their connectors reach a server over the internet, from the vendor's servers, so they need an address with HTTPS. [Serve Catchbunny for a team](teams.md) and add `https://<your address>/mcp` as a custom connector (Claude: Customize > Connectors > Add > Add custom connector). The connector finds the server's OAuth metadata, registers itself, and sends you to your own server to sign in and allow it. No token is pasted anywhere.
 
-Scans are made **from the machine Catchbunny is on**: `http://localhost:3000` in a scan is that machine's own dev server. Whoever can use the endpoint can make that machine open any address it can reach, so nothing but localhost is answered without a sign-in or a key, and `--host 0.0.0.0` without `--team` is refused.
+Scans are made **from the machine Catchbunny is on**: `http://localhost:3000` in a scan is that machine's own dev server. Whoever can use the endpoint can make that machine open any address it can reach (except a cloud metadata service: see [Teams](teams.md)), so nothing but localhost is answered without a sign-in or a key, and `--host 0.0.0.0` without `--team` is refused.
 
 ## Tools
 

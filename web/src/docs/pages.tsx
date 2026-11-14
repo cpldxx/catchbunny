@@ -124,7 +124,7 @@ export const PAGES: Page[] = [
         ["ChatGPT", "Developer mode under Settings, Apps and connectors. Create, and enter the address"],
         ["Claude Code", <>{c("claude mcp add --transport http catchbunny <address>")}, then {c("/mcp")} to sign in</>],
       ] } },
-      { note: "Scans run from the machine Catchbunny is on. Whoever can use the endpoint can make that machine open any address it can reach, which is why nothing but localhost is answered without a sign-in or a key." },
+      { note: "Scans run from the machine Catchbunny is on. Whoever can use the endpoint can make that machine open any address it can reach, except a cloud metadata service, which is why nothing but localhost is answered without a sign-in or a key." },
       { h: "Tools" },
       { table: { head: ["Tool", "What it does"], rows: [
         [c("scan"), "Hunts for bugs at an address and returns verified findings, one line each"],
@@ -181,7 +181,8 @@ export const PAGES: Page[] = [
         "Passwords are stretched with scrypt. The password itself is never stored.",
         "Sessions, keys and connector tokens are stored as hashes, so reading the database does not let you in.",
         "The session cookie is HttpOnly and SameSite, and Secure when the address is HTTPS. A request from another site is refused even with the cookie.",
-        "Eight wrong passwords for one address in five minutes, and that address waits.",
+        "Eight wrong guesses at one account, or thirty from one network address, in five minutes, and the next ones wait. Passwords are checked in a thread, a few at a time, so a flood of sign-ins cannot stall the server.",
+        "No scan opens a cloud machine's metadata service (169.254.169.254 and the like). On a team server every request a tester makes is checked. A redirect gets past that check, so on AWS also require IMDSv2.",
       ] },
     ],
   },

@@ -43,6 +43,7 @@ from ..brain.claude import AnthropicProvider
 from ..brain.llm import LLMGateway, ModelBrain, plan_charters
 from ..brain.ollama import OllamaProvider
 from ..brain.heuristic import HeuristicBrain
+from ..browser import netguard
 from ..browser.session import BrowserPool, EngineUnavailable, Session
 from ..budget import Budget
 from ..config import Settings
@@ -325,6 +326,8 @@ class RunManager:
 
     async def _preflight(self, ctx: RunContext) -> None:
         """Fail fast, and say so plainly, when there is no app to test."""
+        if reason := await netguard.refusal(ctx.env.base_url):
+            raise RunBlocked(f"Catchbunny does not open {ctx.env.base_url}: {reason}. No app under test lives there.")
         try:
             async with self.app.pool.context(browser=ctx.run.spec.browser) as bctx:
                 session = await Session.open(bctx, base_url=ctx.env.base_url, device="desktop", settings=self.app.settings)

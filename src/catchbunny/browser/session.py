@@ -36,7 +36,7 @@ from playwright.async_api import Error as PlaywrightError
 from ..config import Settings
 from ..domain import BROWSERS, Action, Check, CheckResult, Credential, LoginRecipe, Policy, Signal, norm_text, origin_of, url_path
 from ..store import ArtifactStore
-from . import samples
+from . import netguard, samples
 from .locate import ElementNotFound, app_frames, resolve
 from .observe import PAGE_QUIET_JS, PAGE_TRACKER_JS, SNAPSHOT_JS, Observation, merge
 
@@ -186,6 +186,8 @@ class BrowserPool:
                     locale="en-US",
                 )
                 await ctx.add_init_script(PAGE_TRACKER_JS)
+                if self.s.guard_network:
+                    await ctx.route("**/*", netguard.guard)
                 yield ctx
             finally:
                 slot.active -= 1
