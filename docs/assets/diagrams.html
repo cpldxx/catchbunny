@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Catchbunny: the README's figures</title>
+<!--
+  The two diagrams in README.md. web/scripts/readme_images.py renders each <figure> to
+  docs/assets/<id>.png, with the product's own fonts and the numbers of one real run
+  (it calls draw() below with them). Opened as a file, this page shows the last run's
+  numbers in whatever fonts the system has.
+-->
+<style>
+  :root {
+    --page: #0c1511; --card: #111c17; --raised: #18261f;
+    --text: #e8efe3; --secondary: #a9b7a8; --muted: #869585;
+    --hairline: rgba(226, 238, 224, 0.09); --hairline-strong: rgba(226, 238, 224, 0.18);
+    --accent: #f3e7a1; --negative: #ff6b68;
+    --ui: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "Recursive Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --display: "Recursive Casual", "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { padding: 24px; }
+  figure { position: relative; width: 880px; margin: 0 0 32px; padding: 28px 28px 20px; background: var(--page); border: 1px solid var(--hairline-strong); border-radius: 16px; color: var(--text); font: 13px/19px var(--ui); }
+  code { font: 12px/18px var(--mono); }
+  h3, h4, p { margin: 0; }
+  .foot { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--hairline); color: var(--muted); font-size: 12px; line-height: 18px; }
+
+  /* A run, stage by stage */
+  .stages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 22px; }
+  .stages li { position: relative; min-width: 0; }
+  .stages li + li::before { content: ""; position: absolute; left: -15px; top: 52px; width: 7px; height: 7px; border-top: 1.5px solid var(--muted); border-right: 1.5px solid var(--muted); transform: rotate(45deg); }
+  .stages h3 { margin: 14px 0 4px; font: 800 20px/24px var(--display); letter-spacing: -0.01em; }
+  .stages p { color: var(--secondary); }
+  .metric { display: block; margin-top: 10px; font: 12px/16px var(--mono); color: var(--muted); }
+  .metric b { color: var(--accent); font-weight: 600; }
+  .art { height: 112px; padding: 10px 11px; background: var(--card); border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
+
+  .map { display: flex; flex-direction: column; justify-content: space-between; font: 11px/13px var(--mono); color: var(--secondary); }
+  .map span { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .map span::before { content: ""; flex: none; width: 4px; height: 4px; border-radius: 1px; background: var(--muted); }
+  .map span:first-child::before { background: var(--accent); }
+  .map .in { padding-left: 11px; }
+  .map i { font-style: normal; color: var(--muted); }
+
+  .hunt { display: flex; flex-direction: column; justify-content: space-between; }
+  .lane { display: flex; align-items: flex-end; gap: 1px; height: 16px; }
+  .lane i { position: relative; flex: none; height: 6px; border-radius: 1px; background: rgba(169, 183, 168, 0.5); }
+  .lane .sight::after { content: ""; position: absolute; left: 50%; top: -8px; width: 5px; height: 5px; margin-left: -2.5px; background: var(--accent); transform: rotate(45deg); }
+
+  .verify { display: flex; flex-direction: column; justify-content: space-between; padding-top: 12px; padding-bottom: 12px; }
+  .verify div { display: flex; align-items: center; gap: 6px; }
+  .dia { flex: none; width: 7px; height: 7px; margin: 0 2px; background: var(--accent); transform: rotate(45deg); }
+  .wire { flex: 1; height: 1px; background: var(--hairline-strong); }
+  .pip { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .disc { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); }
+  .disc::after { content: ""; width: 7px; height: 4px; margin-top: -2px; border-left: 1.5px solid var(--page); border-bottom: 1.5px solid var(--page); transform: rotate(-45deg); }
+  .verify .lost .dia { background: var(--muted); }
+  .verify .lost .pip { background: none; border: 1px solid var(--muted); }
+  .verify .lost .disc { background: none; }
+  .verify .lost .disc::after { content: "×"; width: auto; height: auto; margin: -1px 0 0; border: 0; transform: none; color: var(--muted); font: 15px/16px var(--ui); }
+
+  .shorten { display: flex; flex-direction: column; justify-content: center; gap: 4px; font: 10.5px/14px var(--mono); color: var(--muted); }
+  .ticks { display: flex; gap: 2px; margin-bottom: 8px; }
+  .ticks i { flex: none; width: 5px; height: 14px; border-radius: 1px; background: rgba(169, 183, 168, 0.4); }
+  .ticks.kept { margin-bottom: 0; }
+  .ticks.kept i { background: var(--accent); }
+
+  .report { display: flex; flex-direction: column; gap: 7px; }
+  .sev { display: flex; align-items: flex-end; gap: 2px; font: 600 11px/12px var(--mono); color: var(--negative); }
+  .sev i { width: 3px; border-radius: 1px; background: var(--negative); }
+  .sev i:nth-child(1) { height: 4px; } .sev i:nth-child(2) { height: 7px; } .sev i:nth-child(3) { height: 10px; }
+  .sev i:nth-child(4) { height: 13px; background: var(--hairline-strong); }
+  .sev span { margin-left: 5px; }
+  .report strong { font: 600 12.5px/16px var(--ui); }
+  .chips { display: flex; gap: 4px; margin-top: auto; }
+  .chips span { padding: 0 5px; border: 1px solid var(--hairline-strong); border-radius: 5px; font: 10px/16px var(--mono); color: var(--secondary); }
+
+  /* Where it runs */
+  .topo { display: grid; grid-template-columns: 216px 46px 1fr 46px 184px; align-items: stretch; }
+  .clients { grid-column: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+  .server { grid-column: 3; }
+  .target { grid-column: 5; }
+  .node, .target { padding: 14px 16px; background: var(--card); border: 1px solid var(--hairline); border-radius: 12px; }
+  .node h4, .target h4, .how h4 { font: 800 16px/20px var(--display); }
+  .node code, .target code { display: block; margin: 4px 0 6px; color: var(--accent); }
+  .node p, .target p { color: var(--secondary); }
+  .target { align-self: center; border-style: dashed; border-color: var(--hairline-strong); background: none; }
+  .target code { margin: 0; color: var(--text); }
+  .target code:first-of-type { margin-top: 6px; }
+  .target p { margin-top: 8px; }
+
+  .server { padding: 16px; background: var(--card); border: 1px solid rgba(243, 231, 161, 0.38); border-radius: 12px; }
+  .server header { display: flex; align-items: baseline; justify-content: space-between; }
+  .server header code { font-size: 15px; font-weight: 600; color: var(--accent); }
+  .server header span { font-size: 12px; color: var(--muted); }
+  .ports { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .ports div { padding: 7px 10px; background: var(--raised); border-radius: 8px; font-weight: 600; }
+  .ports code { display: block; font-weight: 400; color: var(--muted); }
+  .swarm { margin-top: 14px; padding: 12px 0 2px; border-top: 1px solid var(--hairline); }
+  .swarm h4 { font: 600 13px/18px var(--ui); }
+  .swarm p { font-size: 12px; line-height: 17px; color: var(--muted); }
+  .wins { display: flex; gap: 7px; margin: 12px 0 10px; }
+  .wins i { position: relative; flex: 1; height: 30px; border: 1px solid var(--hairline-strong); border-radius: 5px; background:
+    linear-gradient(var(--hairline-strong), var(--hairline-strong)) 0 7px / 100% 1px no-repeat,
+    linear-gradient(rgba(169, 183, 168, 0.35), rgba(169, 183, 168, 0.35)) 5px 13px / 60% 3px no-repeat,
+    linear-gradient(rgba(169, 183, 168, 0.2), rgba(169, 183, 168, 0.2)) 5px 20px / 40% 3px no-repeat; }
+  .wins .sight::after { content: ""; position: absolute; right: -4px; top: -4px; width: 7px; height: 7px; background: var(--accent); transform: rotate(45deg); }
+  .store { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline); font-size: 12px; color: var(--muted); }
+  .store code { margin-right: 6px; color: var(--secondary); }
+  #wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  .also { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .also code { display: block; margin-bottom: 2px; color: var(--secondary); }
+</style>
+</head>
+<body>
+
+<figure id="pipeline">
+  <ol class="stages">
+    <li>
+      <div class="art map">
+        <span>/</span><span>/products</span><span class="in">/:id <i>×6</i></span><span>/cart</span><span>/checkout</span><span>/account</span><span>/search</span>
+      </div>
+      <h3>Map</h3>
+      <p>Finds every screen and control, for each persona and device.</p>
+      <span class="metric"><b data-m="screens">22</b> screens</span>
+    </li>
+    <li>
+      <div class="art hunt" id="lanes"></div>
+      <h3>Hunt</h3>
+      <p>A swarm of browsers explores and fuzzes in parallel.</p>
+      <span class="metric"><b data-m="steps">474</b> steps</span>
+    </li>
+    <li>
+      <div class="art verify">
+        <div><i class="dia"></i><b class="wire"></b><i class="pip"></i><i class="pip"></i><b class="wire"></b><i class="disc"></i></div>
+        <div><i class="dia"></i><b class="wire"></b><i class="pip"></i><i class="pip"></i><b class="wire"></b><i class="disc"></i></div>
+        <div class="lost"><i class="dia"></i><b class="wire"></b><i class="pip"></i><i class="pip"></i><b class="wire"></b><i class="disc"></i></div>
+        <div><i class="dia"></i><b class="wire"></b><i class="pip"></i><i class="pip"></i><b class="wire"></b><i class="disc"></i></div>
+      </div>
+      <h3>Verify</h3>
+      <p>Replays each candidate in fresh browsers. Only what repeats is reported.</p>
+      <span class="metric"><b data-m="confirmed">10</b> of <span data-m="candidates">10</span> confirmed</span>
+    </li>
+    <li>
+      <div class="art shorten">
+        <span><span data-m="taken">16</span> steps taken</span>
+        <div class="ticks" id="taken"></div>
+        <span><span data-m="needed">9</span> steps needed</span>
+        <div class="ticks kept" id="needed"></div>
+      </div>
+      <h3>Shorten</h3>
+      <p>Cuts the path to the fewest steps that still show the bug.</p>
+      <span class="metric"><b><span data-m="before">102</span> → <span data-m="after">29</span></b> steps in all</span>
+    </li>
+    <li>
+      <div class="art report">
+        <div class="sev"><i></i><i></i><i></i><i></i><span data-m="severity">P1</span></div>
+        <strong data-m="title">POST /api/orders returns 500</strong>
+        <div class="chips"><span>video</span><span>trace</span><span>test</span></div>
+      </div>
+      <h3>Report</h3>
+      <p>Ranked, with video and logs, as a test your agent or CI can run.</p>
+      <span class="metric"><b data-m="blocking">2</b> fail the <span data-m="gate">P1</span> gate</span>
+    </li>
+  </ol>
+  <p class="foot">A diamond is a step where a detector fired, and a ticked disc is a bug that happened again in a fresh browser. The numbers are from the run pictured above: the bundled demo shop, no AI model, <span data-m="seconds">38</span> seconds.</p>
+</figure>
+
+<figure id="how-it-runs">
+  <svg id="wires" aria-hidden="true"></svg>
+  <div class="topo">
+    <div class="clients">
+      <div class="node">
+        <h4>Your browser</h4>
+        <code>/app</code>
+        <p>Watch a run live and open what it caught.</p>
+      </div>
+      <div class="node">
+        <h4>Claude Code, Codex</h4>
+        <code>/mcp</code>
+        <p>Scan, read a finding, fix it, check the fix.</p>
+      </div>
+    </div>
+    <div class="server">
+      <header><code>catchbunny start</code><span>one process, port 8700</span></header>
+      <div class="ports">
+        <div>Console<code>/app</code></div>
+        <div>API<code>/v1</code></div>
+        <div>MCP<code>/mcp</code></div>
+      </div>
+      <div class="swarm" id="swarm">
+        <h4>Browser testers</h4>
+        <div class="wins"><i></i><i></i><i class="sight"></i><i></i><i></i><i></i></div>
+        <p>Chromium, WebKit or Firefox, driven through Playwright</p>
+      </div>
+      <div class="store"><code>~/.catchbunny</code>runs, findings, recordings</div>
+    </div>
+    <div class="target" id="target">
+      <h4>Your app</h4>
+      <code>localhost:3000</code>
+      <code>staging.example.com</code>
+      <p>Nothing is installed in it: no SDK, no code. Only its address.</p>
+    </div>
+  </div>
+  <div class="foot also">
+    <div><code>catchbunny scan &lt;url&gt;</code>In a terminal or CI: the same engine with no console. Exit code 1 on a confirmed bug.</div>
+    <div><code>catchbunny start --team</code>For a team: the same process behind HTTPS on your own domain, with a sign-in.</div>
+  </div>
+</figure>
+
+<script>
+  // The lanes are decoration with a fixed seed: they stand for a swarm at work, and
+  // carry no measurement. Everything with a number in it comes from draw()'s argument.
+  function lanes() {
+    let seed = 7;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const box = document.getElementById("lanes");
+    box.replaceChildren();
+    for (let lane = 0; lane < 5; lane++) {
+      const row = document.createElement("div");
+      row.className = "lane";
+      let used = 0;
+      const room = 96 + rand() * 26;
+      while (used < room) {
+        const step = document.createElement("i");
+        const width = 2 + Math.round(rand() * 5);
+        step.style.width = width + "px";
+        if (rand() < 0.09 && used > 6) step.className = "sight";
+        row.append(step);
+        used += width + 1;
+      }
+      box.append(row);
+    }
+  }
+
+  function ticks(id, count) {
+    document.getElementById(id).replaceChildren(...Array.from({ length: count }, () => document.createElement("i")));
+  }
+
+  function wires() {
+    const svg = document.getElementById("wires");
+    const frame = svg.getBoundingClientRect();
+    const at = (el) => { const r = el.getBoundingClientRect(); return { left: r.left - frame.left, right: r.right - frame.left, mid: r.top - frame.top + r.height / 2 }; };
+    const server = at(document.querySelector(".server"));
+    const line = (x1, x2, y, colour) => `<path d="M${x1 + 5} ${y}H${x2 - 6}" stroke="${colour}" stroke-width="1.5" fill="none"/><path d="M${x2 - 11} ${y - 4}l5 4l-5 4" stroke="${colour}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    let drawn = "";
+    for (const node of document.querySelectorAll(".node")) { const n = at(node); drawn += line(n.right, server.left, n.mid, "#869585"); }
+    drawn += line(server.right, at(document.getElementById("target")).left, at(document.querySelector(".wins")).mid, "#f3e7a1");
+    svg.innerHTML = drawn;
+  }
+
+  function draw(numbers = {}) {
+    for (const [name, value] of Object.entries(numbers)) for (const el of document.querySelectorAll(`[data-m="${name}"]`)) el.textContent = value;
+    const read = (name) => Number(document.querySelector(`[data-m="${name}"]`).textContent);
+    lanes();
+    ticks("taken", read("taken"));
+    ticks("needed", read("needed"));
+    wires();
+  }
+  draw();
+</script>
+</body>
+</html>
