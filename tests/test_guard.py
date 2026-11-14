@@ -158,3 +158,26 @@ async def test_on_a_team_server_no_link_or_page_reaches_the_metadata_service(app
         with pytest.raises(PlaywrightError, match="ERR_BLOCKED_BY_CLIENT"):
             await page.goto("http://2852039166/latest/meta-data/", timeout=5000)
         assert any("metadata.google.internal" in r for r in refused) and any("169.254.169.254" in r for r in refused), refused
+
+
+@pytest.mark.parametrize(
+    ("origin", "allowed"),
+    [
+        (None, True),  # an agent or the CLI: not a page, no Origin
+        ("http://127.0.0.1:8700", True),  # the console itself
+        ("http://localhost:5173", True),  # the console's dev server, through its proxy
+        ("https://evil.example", False),
+        ("null", False),  # a sandboxed frame or a file, which another site can arrange
+        ("http://169.254.169.254", False),
+    ],
+)
+async def test_on_your_own_machine_another_site_cannot_start_or_stop_anything(app: App, origin: str | None, allowed: bool) -> None:
+    api = create_app(app, serving=Serving(local_only=True))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=api), base_url="http://127.0.0.1:8700") as http:
+        headers = {"origin": origin} if origin else {}
+        stopped = await http.post("/v1/runs/run_nope/cancel", headers=headers)
+        assert stopped.status_code == (404 if allowed else 403), stopped.text
+        assert (await http.get("/v1/projects", headers=headers)).status_code == 200, "reading is not refused: without CORS headers another site cannot see the answer"
+        if not allowed:
+            assert (await http.post("/v1/demo", headers=headers)).status_code == 403
+            assert (await http.get("/v1/projects")).json() == [], "the demo shop was not started"

@@ -139,6 +139,15 @@ def _refuse(scope: Scope, receive: Receive, send: Send, status: int, code: str, 
     return JSONResponse({"status": "error", "code": code, "message": message, "retryable": False}, status_code=status)(scope, receive, send)
 
 
+def _from_this_machine(origin: str | None) -> bool:
+    """Whether a request's Origin is a page on this machine, or there is none (a client that is not a page).
+    `null` is refused: a sandboxed frame or a file sends it, and either can be another site's doing."""
+    if origin is None:
+        return True
+    parts = urlsplit(origin)
+    return parts.scheme in ("http", "https") and (parts.hostname or "") in LOOPBACK
+
+
 def _hostname(host: str) -> str:
     """The name in a Host header, without the port: `localhost:8700`, `[::1]:8700`."""
     if host.startswith("["):
@@ -175,6 +184,12 @@ class Guard:
             # A page on another site can point a name of its own at 127.0.0.1 and talk to a local server
             # through the browser. Such a request names that site, never localhost.
             await _refuse(scope, receive, send, 403, "FORBIDDEN", "This server answers only requests addressed to localhost. To use it from elsewhere, serve it for a team: catchbunny start --team")
+            return
+        if self.serving.local_only and scope["method"] not in SAFE_METHODS and not _from_this_machine(headers.get("origin")):
+            # A page on another site, open in the same browser, can still send a plain POST to localhost: it
+            # cannot read the answer, but it could start or cancel a run. Only pages served from this machine
+            # (the console, a dev server) and clients that are not pages (agents, the CLI: no Origin) may.
+            await _refuse(scope, receive, send, 403, "FORBIDDEN", "This request came from another site.")
             return
         state = scope.setdefault("state", {})
         state["user"] = None
